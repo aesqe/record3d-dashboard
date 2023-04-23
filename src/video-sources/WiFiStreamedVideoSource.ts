@@ -2,6 +2,17 @@ import * as THREE from 'three'
 import { getMetadata, Record3DSignalingClient } from './SignalingClient.js'
 
 export class WiFiStreamedVideoSource {
+  peerAddress: string
+  intrMat: THREE.Matrix3 | null
+  videoTag: HTMLVideoElement
+  isVideoLoaded: boolean
+  lastVideoSize: { width: number; height: number }
+  onVideoChange: () => void
+  maxNumPoints: number
+  originalVideoSize: { width?: number; height?: number }
+  peerConnection: RTCPeerConnection | null
+  signalingClient: Record3DSignalingClient | null
+
   constructor(deviceAddress) {
     this.peerAddress = deviceAddress
     this.intrMat = null
@@ -9,7 +20,7 @@ export class WiFiStreamedVideoSource {
     this.videoTag.autoplay = true
     this.videoTag.muted = true
     this.videoTag.loop = true
-    this.videoTag.playsinline = true
+    this.videoTag.playsInline = true
     this.videoTag.setAttribute('playsinline', '')
     this.isVideoLoaded = false
     this.lastVideoSize = { width: 0, height: 0 }
@@ -45,9 +56,9 @@ export class WiFiStreamedVideoSource {
       if (event.candidate === null) {
         let jsonData = {
           type: 'answer',
-          data: self.peerConnection.localDescription.sdp
+          data: self.peerConnection?.localDescription?.sdp
         }
-        self.signalingClient.sendAnswer(jsonData)
+        self.signalingClient?.sendAnswer(jsonData)
       }
     }
 
@@ -62,9 +73,9 @@ export class WiFiStreamedVideoSource {
       if (remoteOffer === undefined) return
 
       self.peerConnection
-        .setRemoteDescription(remoteOffer)
-        .then(() => self.peerConnection.createAnswer())
-        .then(sdp => self.peerConnection.setLocalDescription(sdp))
+        ?.setRemoteDescription(remoteOffer)
+        .then(() => self.peerConnection?.createAnswer())
+        .then(sdp => self.peerConnection?.setLocalDescription(sdp))
     })
   }
 
@@ -90,8 +101,11 @@ export class WiFiStreamedVideoSource {
   }
 
   toggle() {
-    if (this.videoTag.paused) this.videoTag.play()
-    else this.videoTag.pause()
+    if (this.videoTag.paused) {
+      this.videoTag.play()
+    } else {
+      this.videoTag.pause()
+    }
   }
 
   toggleAudio() {
@@ -104,12 +118,16 @@ export class WiFiStreamedVideoSource {
     intrMat.elements = origIntrMatElements
     intrMat.transpose()
 
-    if (origVideoSize.width === undefined || origVideoSize.height === undefined)
+    if (
+      origVideoSize.width === undefined ||
+      origVideoSize.height === undefined
+    ) {
       intrMat.multiplyScalar(
         this.videoTag.videoHeight / (origIntrMatElements[5] < 256 ? 256 : 640)
       )
-    else
+    } else {
       intrMat.multiplyScalar(this.videoTag.videoHeight / origVideoSize.height)
+    }
 
     intrMat.elements[8] = 1
 
@@ -117,7 +135,8 @@ export class WiFiStreamedVideoSource {
   }
 
   processMetadata(metadata) {
-    let ogVideoSizeKey = 'originalSize'
+    const ogVideoSizeKey = 'originalSize'
+
     if (ogVideoSizeKey in metadata) {
       let originalVideoSize = metadata[ogVideoSizeKey]
       this.originalVideoSize.width = originalVideoSize[0]

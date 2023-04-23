@@ -1,14 +1,24 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js'
-import { Record3DVideoRenderingMode } from './Record3DVideo.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
-import { DotScreenPass } from 'three/examples/jsm/postprocessing/DotScreenPass.js'
+import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js'
+
+import { guiHelper } from './gui-helper.js'
+import { Record3DVideo } from './Record3DVideo.js'
 
 let then = 0
 
 export class Record3DScene {
+  mainScene: THREE.Scene
+  renderer: THREE.WebGLRenderer
+  camera: THREE.PerspectiveCamera
+  controls: OrbitControls
+  composer: EffectComposer
+  pointClouds: Record3DVideo[]
+  options: any
+  gui: GUI
+
   constructor(fov, near, far) {
     let self = this
     this.mainScene = new THREE.Scene()
@@ -28,7 +38,6 @@ export class Record3DScene {
 
     this.composer = new EffectComposer(this.renderer)
     this.composer.addPass(new RenderPass(this.mainScene, this.camera))
-    // this.composer.addPass(new DotScreenPass(undefined, 10, 50.0))
 
     // Camera control settings
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
@@ -43,87 +52,46 @@ export class Record3DScene {
     document.body.appendChild(this.renderer.domElement)
 
     // Setup resizing
-    window.addEventListener('resize', e => this.onWindowResize(e), false)
-    this.onWindowResize(null)
+    window.addEventListener('resize', this.onWindowResize, false)
+    this.onWindowResize()
 
     // Setup UI
     this.options = {
       modelScale: 1.0,
       modelPointSize: 1.0,
-      opacity: 1.0,
+      opacity: 0.5,
+      saturation: 3.0,
+      singleColorVec: '#ffffff',
+      useSingleColor: true,
+      renderNthPoint: 1,
       toggleSound: () => {
         for (let video of self.pointClouds) video.toggleSound()
       },
       toggleVideo: () => {
         for (let video of self.pointClouds) video.toggle()
-      },
-      toggleMeshPoints: () => {
-        for (let video of self.pointClouds) {
-          let newRenderingMode =
-            video.renderingMode === Record3DVideoRenderingMode.MESH
-              ? Record3DVideoRenderingMode.POINTS
-              : Record3DVideoRenderingMode.MESH
-          video.switchRenderingTo(newRenderingMode)
-        }
       }
     }
-    let gui = new GUI()
-    gui
-      .add(this.options, 'modelScale')
-      .min(1)
-      .max(20)
-      .step(0.1)
-      .onChange(() => {
-        for (let ptCloud of self.pointClouds) {
-          ptCloud.setScale(self.options.modelScale)
-        }
-      })
 
-    gui
-      .add(this.options, 'modelPointSize')
-      .min(0.1)
-      .max(20)
-      .step(0.1)
-      .onChange(() => {
-        for (let ptCloud of self.pointClouds) {
-          ptCloud.setPointSize(self.options.modelPointSize)
-        }
-      })
-
-    gui
-      .add(this.options, 'opacity')
-      .min(0.1)
-      .max(1.0)
-      .step(0.1)
-      .onChange(() => {
-        for (let ptCloud of self.pointClouds) {
-          ptCloud.setOpacity(self.options.opacity)
-        }
-      })
-
-    gui.add(this.options, 'toggleSound').name('Mute/Unmute')
-    gui.add(this.options, 'toggleVideo').name('Play/Pause')
-    gui.add(this.options, 'toggleMeshPoints').name('Render points/mesh')
+    this.gui = guiHelper(self)
   }
 
-  addVideo(r3dVideo) {
-    console.log(r3dVideo)
+  addVideo(r3dVideo: Record3DVideo) {
     this.pointClouds.push(r3dVideo)
     this.mainScene.add(r3dVideo.videoObject)
   }
 
-  runloop(now) {
+  runLoop(now = then) {
     now *= 0.001 // convert to seconds
     const deltaTime = now - then
     then = now
 
     this.composer.render(deltaTime)
-    requestAnimationFrame(this.runloop.bind(this))
+    requestAnimationFrame(this.runLoop.bind(this))
   }
 
   toggleSound() {
     for (let ptCloud of this.pointClouds) {
-      ptCloud.toggleAudio()
+      ptCloud.toggleSound()
     }
   }
 
@@ -133,14 +101,16 @@ export class Record3DScene {
     const width = canvas.clientWidth
     const height = canvas.clientHeight
     const needResize = canvas.width !== width || canvas.height !== height
+
     if (needResize) {
       this.composer.setSize(canvas.width, canvas.height)
     }
+
     return needResize
   }
 
-  onWindowResize(event) {
-    if (this.resizeRendererToDisplaySize(this.renderer)) {
+  onWindowResize() {
+    if (this.resizeRendererToDisplaySize()) {
       const canvas = this.renderer.domElement
       this.camera.aspect = canvas.clientWidth / canvas.clientHeight
       this.camera.updateProjectionMatrix()

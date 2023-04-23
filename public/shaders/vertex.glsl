@@ -9,6 +9,7 @@ uniform sampler2D texImg;
 uniform vec4 iK;
 uniform float scale;
 uniform float ptSize;
+uniform int renderNthPoint;
 
 // Filtering constants
 const int filterSize = 1;
@@ -37,21 +38,21 @@ bool shouldDiscard(ivec2 currPixel, int vertIdx) {
   float centerPixelDepth = getPixelDepth(currPixel);
 
   for (int i = -filterSize; i <= filterSize; i++) for (int j = -filterSize; j <= filterSize; j++) {
-    if (i == 0 && j == 0)
-    continue;
+      if (i == 0 && j == 0)
+        continue;
 
-    float currDepth = getPixelDepth(currPixel + ivec2(j, i));
+      float currDepth = getPixelDepth(currPixel + ivec2(j, i));
 
-    if (currDepth < absoluteDepthRangeFilter.x || currDepth >= absoluteDepthRangeFilter.y || abs(centerPixelDepth - currDepth) > depthThresholdFilter) {
-      return true;
+      if (currDepth < absoluteDepthRangeFilter.x || currDepth >= absoluteDepthRangeFilter.y || abs(centerPixelDepth - currDepth) > depthThresholdFilter) {
+        return true;
+      }
     }
+
+  if (vertIdx > 0 && vertIdx % renderNthPoint != 0) {
+    return true;
   }
 
-  if (vertIdx % 14 == 0) {
-    return false;
-  }
-
-  return true;
+  return false;
 }
 
 void main() {
@@ -79,11 +80,7 @@ void main() {
 
   float currDepth = getPixelDepth(pt) * 2.0;
 
-  vec3 ptPos = scale * vec3(
-  (iK.x * float(ptX) + iK.z) * currDepth,
-  (iK.y * float(ptY) + iK.w) * currDepth,
-  -currDepth
-  );
+  vec3 ptPos = scale * vec3((iK.x * float(ptX) + iK.z) * currDepth, (iK.y * float(ptY) + iK.w) * currDepth, -currDepth);
 
   vec4 mvPos = modelViewMatrix * vec4(ptPos, 1.0);
   gl_Position = projectionMatrix * mvPos;

@@ -9,5 +9,5 @@ module.exports = {
   spaceBeforeFunctionParen: false,
   tabWidth: 2,
   trailingComma: 'none',
-  useTabs: false
+  useTabs: false,
 }
