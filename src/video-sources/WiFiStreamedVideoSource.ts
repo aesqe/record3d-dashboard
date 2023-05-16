@@ -4,7 +4,7 @@ import { getMetadata, Record3DSignalingClient } from './SignalingClient.js'
 export class WiFiStreamedVideoSource {
   peerAddress: string
   intrMat: THREE.Matrix3 | null
-  videoTag: HTMLVideoElement
+  videoElement: HTMLVideoElement
   isVideoLoaded: boolean
   lastVideoSize: { width: number; height: number }
   onVideoChange: () => void
@@ -13,15 +13,15 @@ export class WiFiStreamedVideoSource {
   peerConnection: RTCPeerConnection | null
   signalingClient: Record3DSignalingClient | null
 
-  constructor(deviceAddress) {
+  constructor(deviceAddress: string) {
     this.peerAddress = deviceAddress
     this.intrMat = null
-    this.videoTag = document.createElement('video')
-    this.videoTag.autoplay = true
-    this.videoTag.muted = true
-    this.videoTag.loop = true
-    this.videoTag.playsInline = true
-    this.videoTag.setAttribute('playsinline', '')
+    this.videoElement = document.createElement('video')
+    this.videoElement.autoplay = true
+    this.videoElement.muted = true
+    this.videoElement.loop = true
+    this.videoElement.playsInline = true
+    this.videoElement.setAttribute('playsinline', '')
     this.isVideoLoaded = false
     this.lastVideoSize = { width: 0, height: 0 }
     this.onVideoChange = () => {}
@@ -32,13 +32,13 @@ export class WiFiStreamedVideoSource {
     this.signalingClient = null
 
     let self = this
-    this.videoTag.onloadeddata = e => {
-      self.updateVideoResolution()
+    this.videoElement.onloadeddata = async e => {
+      await self.updateVideoResolution()
       self.onVideoChange()
     }
 
-    this.videoTag.onprogress = e => {
-      self.updateVideoResolution()
+    this.videoElement.onprogress = async e => {
+      await self.updateVideoResolution()
     }
   }
 
@@ -63,7 +63,7 @@ export class WiFiStreamedVideoSource {
     }
 
     this.peerConnection.ontrack = event => {
-      self.videoTag.srcObject = event.streams[0]
+      self.videoElement.srcObject = event.streams[0]
       getMetadata(this.peerAddress).then(metadata =>
         self.processMetadata(metadata)
       )
@@ -79,18 +79,17 @@ export class WiFiStreamedVideoSource {
     })
   }
 
-  updateVideoResolution() {
+  async updateVideoResolution() {
     if (
-      this.videoTag.videoWidth != this.lastVideoSize.width ||
-      this.videoTag.videoHeight != this.lastVideoSize.height
+      this.videoElement.videoWidth != this.lastVideoSize.width ||
+      this.videoElement.videoHeight != this.lastVideoSize.height
     ) {
-      getMetadata(this.peerAddress).then(metadata =>
-        this.processMetadata(metadata)
-      )
+      const metadata = await getMetadata(this.peerAddress)
+      this.processMetadata(metadata)
     }
 
-    this.lastVideoSize.width = this.videoTag.videoWidth
-    this.lastVideoSize.height = this.videoTag.videoHeight
+    this.lastVideoSize.width = this.videoElement.videoWidth * 2
+    this.lastVideoSize.height = this.videoElement.videoHeight * 2
   }
 
   getVideoSize() {
@@ -100,19 +99,37 @@ export class WiFiStreamedVideoSource {
     }
   }
 
+  getNumPoints() {
+    return (this.lastVideoSize.width / 2) * this.lastVideoSize.height
+  }
+
+  getIKValue() {
+    const matrix = this.intrMat!.elements
+
+    const ifx = 1.0 / matrix[0]
+    const ify = 1.0 / matrix[4]
+    const itx = -matrix[2] / matrix[0]
+    const ity = -matrix[5] / matrix[4]
+
+    return [ifx, ify, itx, ity]
+  }
+
   toggle() {
-    if (this.videoTag.paused) {
-      this.videoTag.play()
+    if (this.videoElement.paused) {
+      this.videoElement.play()
     } else {
-      this.videoTag.pause()
+      this.videoElement.pause()
     }
   }
 
   toggleAudio() {
-    this.videoTag.muted = !this.videoTag.muted
+    this.videoElement.muted = !this.videoElement.muted
   }
 
-  processIntrMat(origIntrMatElements, origVideoSize) {
+  processIntrMat(
+    origIntrMatElements: number[],
+    origVideoSize: { width?: number; height?: number }
+  ) {
     const intrMat = new THREE.Matrix3()
 
     intrMat.elements = origIntrMatElements
@@ -123,10 +140,13 @@ export class WiFiStreamedVideoSource {
       origVideoSize.height === undefined
     ) {
       intrMat.multiplyScalar(
-        this.videoTag.videoHeight / (origIntrMatElements[5] < 256 ? 256 : 640)
+        this.videoElement.videoHeight /
+          (origIntrMatElements[5] < 256 ? 256 : 640)
       )
     } else {
-      intrMat.multiplyScalar(this.videoTag.videoHeight / origVideoSize.height)
+      intrMat.multiplyScalar(
+        this.videoElement.videoHeight / origVideoSize.height
+      )
     }
 
     intrMat.elements[8] = 1
@@ -134,7 +154,7 @@ export class WiFiStreamedVideoSource {
     return intrMat
   }
 
-  processMetadata(metadata) {
+  processMetadata(metadata: Record<string, any>) {
     const ogVideoSizeKey = 'originalSize'
 
     if (ogVideoSizeKey in metadata) {

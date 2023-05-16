@@ -6,7 +6,7 @@ export const guiHelper = (scene: Record3DScene) => {
 
   gui
     .add(scene.options, 'modelScale')
-    .min(1)
+    .min(0.1)
     .max(20)
     .step(0.1)
     .onChange(() => {
@@ -40,11 +40,11 @@ export const guiHelper = (scene: Record3DScene) => {
   gui
     .add(scene.options, 'saturation')
     .min(0.0)
-    .max(3.0)
-    .step(0.1)
+    .max(1.0)
+    .step(0.01)
     .onChange(() => {
       for (let ptCloud of scene.pointClouds) {
-        ptCloud.setSaturation(scene.options.saturation)
+        ptCloud.setSaturation(scene.options.saturation * 3.0)
       }
     })
 
@@ -72,6 +72,25 @@ export const guiHelper = (scene: Record3DScene) => {
     .onChange(() => {
       for (let ptCloud of scene.pointClouds) {
         ptCloud.setRenderNthPoint(scene.options.renderNthPoint)
+      }
+    })
+
+  gui
+    .add(scene.options, 'useNoise')
+    .name('Use displacement noise')
+    .onChange(() => {
+      for (let ptCloud of scene.pointClouds) {
+        ptCloud.useNoise(scene.options.useNoise)
+      }
+    })
+  gui
+    .add(scene.options, 'noiseStrength')
+    .name('Noise strength')
+    .min(0.0)
+    .step(0.1)
+    .onChange(() => {
+      for (let ptCloud of scene.pointClouds) {
+        ptCloud.noiseStrength(scene.options.noiseStrength)
       }
     })
 

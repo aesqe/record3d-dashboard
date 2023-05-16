@@ -2,11 +2,11 @@ import * as THREE from 'three'
 
 import { hexToGL } from './utils'
 
-export const getPointCloudShaderMaterial = async () => {
-  const vertexShaderSrc = await fetch('./shaders/vertex.glsl')
+export const getPointCloudShaderMaterial = async (version = 1) => {
+  const vertexShaderSrc = await fetch(`./shaders/vertex-${version}.glsl`)
   const vertexShader = await vertexShaderSrc.text()
 
-  const fragmentShaderSrc = await fetch('./shaders/fragment.glsl')
+  const fragmentShaderSrc = await fetch(`./shaders/fragment-${version}.glsl`)
   const fragmentShader = await fragmentShaderSrc.text()
 
   return new THREE.ShaderMaterial({
@@ -20,7 +20,12 @@ export const getPointCloudShaderMaterial = async () => {
       saturation: { type: 'f', value: 3.0 },
       singleColorVec: { type: 'f3', value: hexToGL('#ffffff') },
       useSingleColor: { type: 'bool', value: true },
-      renderNthPoint: { type: 'int', value: 1 }
+      renderNthPoint: { type: 'int', value: 1 },
+      seed1: { type: 'f', value: Math.random() },
+      seed2: { type: 'f', value: Math.random() },
+      seed3: { type: 'f', value: Math.random() },
+      useNoise: { type: 'b', value: false },
+      noiseStrength: { type: 'f', value: 0.0 }
     } as Record<string, THREE.IUniform>,
     side: THREE.DoubleSide,
     transparent: true,

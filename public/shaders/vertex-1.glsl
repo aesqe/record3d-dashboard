@@ -10,11 +10,22 @@ uniform vec4 iK;
 uniform float scale;
 uniform float ptSize;
 uniform int renderNthPoint;
+uniform float seed1;
+uniform float seed2;
+uniform float seed3;
+uniform bool useNoise;
+uniform float noiseStrength;
+uniform float transitionTime;
 
 // Filtering constants
 const int filterSize = 1;
-const float depthThresholdFilter = 0.05; // In meters. Smaller values = more aggressive filtering
+const float depthThresholdFilter = 0.005; // In meters. Smaller values = more aggressive filtering
 const vec2 absoluteDepthRangeFilter = vec2(0.1, 2.8);
+
+float random(vec2 st, float seed) {
+  return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) *
+    43758.5453123) * seed * noiseStrength * noiseStrength;
+}
 
 // Modified "rgb2hsv()" from this source: https://stackoverflow.com/a/17897228
 float rgb2hue(vec3 c) {
@@ -62,6 +73,7 @@ void main() {
   int vertIdx = int(vertexIdx);
 
   int actualNumPts = frameSize.x * frameSize.y;
+
   if (vertIdx >= actualNumPts) {
     vShouldDiscard = 1.0;
     gl_Position = vec4(0.0);
@@ -80,7 +92,13 @@ void main() {
 
   float currDepth = getPixelDepth(pt) * 2.0;
 
-  vec3 ptPos = scale * vec3((iK.x * float(ptX) + iK.z) * currDepth, (iK.y * float(ptY) + iK.w) * currDepth, -currDepth);
+  vec3 coords = vec3((iK.x * float(ptX) + iK.z) * currDepth, (iK.y * float(ptY) + iK.w) * currDepth, -currDepth);
+
+  float noisex = useNoise ? random(vec2(coords.x, coords.y), seed1) : 0.0;
+  float noisey = useNoise ? random(vec2(coords.y, coords.z), seed2) : 0.0;
+  float noisez = useNoise ? random(vec2(coords.z, coords.x), seed3) : 0.0;
+
+  vec3 ptPos = scale * (vec3(coords.x + noisex, coords.y + noisey, coords.z + noisez));
 
   vec4 mvPos = modelViewMatrix * vec4(ptPos, 1.0);
   gl_Position = projectionMatrix * mvPos;

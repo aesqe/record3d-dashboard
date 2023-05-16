@@ -3,112 +3,108 @@ import { getPointCloudShaderMaterial } from './pointcloud-material.js'
 import { WiFiStreamedVideoSource } from './video-sources/WiFiStreamedVideoSource.js'
 import { hexToGL } from './utils.js'
 
+interface VideoObject extends THREE.Group {
+  children: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>[]
+}
+
 export class Record3DVideo {
   material: THREE.ShaderMaterial | null
   videoSource: WiFiStreamedVideoSource | null
-  videoObject: THREE.Group
-  videoTexture: THREE.VideoTexture | null
-  buffIndices: Uint32Array
-  buffPointIndicesAttr: Float32Array
+  videoObject: VideoObject
+  id: number
 
-  constructor(videoSource) {
+  constructor(videoSource: WiFiStreamedVideoSource, id: number) {
+    this.id = id
     this.videoSource = null
-    this.videoTexture = null
     this.material = null
-    this.buffIndices = new Uint32Array(0)
-    this.buffPointIndicesAttr = new Float32Array(0)
-    this.videoObject = new THREE.Group()
+    this.videoObject = new THREE.Group() as VideoObject
 
     this.setVideoSource(videoSource)
   }
 
-  async setVideoSource(videoSource) {
+  async setVideoSource(videoSource: WiFiStreamedVideoSource) {
     this.material = await getPointCloudShaderMaterial()
 
     if (videoSource !== this.videoSource) {
       this.videoSource = videoSource
 
-      let self = this
-      videoSource.onVideoChange = () => {
-        self.onVideoTagChanged()
-      }
-    }
+      const existingChangeHandler = videoSource.onVideoChange
+      const changeHandler = this.onVideoTagChanged.bind(this)
 
-    if (videoSource.isVideoLoaded) {
-      this.onVideoTagChanged()
-    } else {
-      this.switchRenderingToPoints()
+      videoSource.onVideoChange = () => {
+        existingChangeHandler?.()
+        changeHandler()
+      }
     }
   }
 
   onVideoTagChanged() {
-    let material = this.material as THREE.ShaderMaterial
-    let videoSource = this.videoSource as WiFiStreamedVideoSource
-
-    this.videoTexture = new THREE.VideoTexture(
-      videoSource?.videoTag as HTMLVideoElement
-    )
-    this.videoTexture.minFilter = THREE.LinearFilter
-    this.videoTexture.magFilter = THREE.LinearFilter
-    this.videoTexture.format = THREE.RGBAFormat
-
-    videoSource?.videoTag.play()
-
-    let newVideoWidth = videoSource?.videoTag.videoWidth
-    let newVideoHeight = videoSource?.videoTag.videoHeight
-
-    material.uniforms.texSize.value = [newVideoWidth, newVideoHeight]
-    material.uniforms.texImg.value = this.videoTexture
-
-    let intrinsicMatrix = videoSource.intrMat as THREE.Matrix3
-    let ifx = 1.0 / intrinsicMatrix.elements[0]
-    let ify = 1.0 / intrinsicMatrix.elements[4]
-    let itx = -intrinsicMatrix.elements[2] / intrinsicMatrix.elements[0]
-    let ity = -intrinsicMatrix.elements[5] / intrinsicMatrix.elements[4]
-
-    material.uniforms.iK.value = [ifx, ify, itx, ity]
-
-    this.switchRenderingToPoints()
-  }
-
-  removeVideoObjectChildren() {
     while (this.videoObject.children.length > 0) {
       this.videoObject.remove(this.videoObject.children[0])
     }
-  }
 
-  switchRenderingToPoints() {
-    this.removeVideoObjectChildren()
+    const geometry = new THREE.BufferGeometry()
+    const material = this.material as THREE.ShaderMaterial
+    const videoSource = this.videoSource as WiFiStreamedVideoSource
 
-    let videoSize = this.videoSource?.getVideoSize()
-    let numPoints = (videoSize?.width ?? 0) * (videoSize?.height ?? 0)
+    const numPoints = videoSource.getNumPoints()
+    const bufferIndices = new Array(numPoints).fill(0).map((_, i) => i)
+    const vertexIdx = new THREE.Float32BufferAttribute(bufferIndices, 3)
+    const geometryIndex = new THREE.Uint32BufferAttribute(bufferIndices, 3)
 
-    this.buffIndices = new Uint32Array(numPoints)
-    this.buffPointIndicesAttr = new Float32Array(numPoints)
+    const { videoElement } = videoSource
+    const newVideoWidth = videoElement.videoWidth * 2
+    const newVideoHeight = videoElement.videoHeight * 2
+    const videoTexture = new THREE.VideoTexture(videoElement)
 
-    for (let ptIdx = 0; ptIdx < numPoints; ptIdx++) {
-      this.buffIndices[ptIdx] = ptIdx
-      this.buffPointIndicesAttr[ptIdx] = parseFloat(ptIdx.toString())
+    videoElement.play()
+
+    videoTexture.minFilter = THREE.LinearFilter
+    videoTexture.magFilter = THREE.LinearFilter
+    videoTexture.format = THREE.RGBAFormat
+    videoTexture.mapping = THREE.CubeReflectionMapping
+
+    material.uniforms.iK.value = videoSource.getIKValue()
+    material.uniforms.texImg.value = videoTexture
+    material.uniforms.texSize.value = [newVideoWidth, newVideoHeight]
+
+    const videoSize = videoSource.getVideoSize()
+    var indicesIdx = 0
+    let numRows = videoSize.height
+    let numCols = videoSize.width
+    for (let row = 1; row < numRows; row++) {
+      for (let col = 0; col < numCols - 1; col++) {
+        let tlIdx = (row - 1) * numCols + col
+        let trIdx = tlIdx + 1
+
+        let blIdx = row * numCols + col
+        let brIdx = blIdx + 1
+
+        bufferIndices[indicesIdx++] = blIdx
+        bufferIndices[indicesIdx++] = trIdx
+        bufferIndices[indicesIdx++] = tlIdx
+
+        bufferIndices[indicesIdx++] = blIdx
+        bufferIndices[indicesIdx++] = brIdx
+        bufferIndices[indicesIdx++] = trIdx
+      }
     }
 
-    let geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('vertexIdx', vertexIdx)
+    geometry.setIndex(geometryIndex)
+    geometry.computeBoundingSphere()
+    geometry.computeVertexNormals()
 
-    geometry.setAttribute(
-      'vertexIdx',
-      new THREE.Float32BufferAttribute(this.buffPointIndicesAttr, 1)
-    )
+    const points = new THREE.Points(geometry, material)
+    const MESH = new THREE.Mesh(geometry, material)
 
-    geometry.setIndex(new THREE.Uint32BufferAttribute(this.buffIndices, 1))
-
-    let points = new THREE.Points(
-      geometry,
-      this.material as THREE.ShaderMaterial
-    )
     points.frustumCulled = false
-    this.videoObject.add(points)
 
-    console.log(points)
+    this.videoObject.add(points)
+    this.videoObject.add(MESH)
   }
+
+  /** MODIFIERS */
 
   toggle() {
     this.videoSource?.toggle()
@@ -118,61 +114,67 @@ export class Record3DVideo {
     this.videoSource?.toggleAudio()
   }
 
-  setScale(value) {
+  setScale(value: number) {
     for (let video of this.videoObject.children) {
-      ;(
-        video as THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>
-      ).material.uniforms.scale.value = value
+      video.material.uniforms.scale.value = value
     }
   }
 
-  setPointSize(value) {
+  setPointSize(value: number) {
     for (let video of this.videoObject.children) {
-      ;(
-        video as THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>
-      ).material.uniforms.ptSize.value = value
+      video.material.uniforms.ptSize.value = value
     }
   }
 
-  setOpacity(value) {
+  setOpacity(value: number) {
     for (let video of this.videoObject.children) {
-      ;(
-        video as THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>
-      ).material.uniforms.opacity.value = value
+      video.material.uniforms.opacity.value = value
     }
   }
 
-  setSaturation(value) {
+  setSaturation(value: number) {
     for (let video of this.videoObject.children) {
-      ;(
-        video as THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>
-      ).material.uniforms.saturation.value = value
+      video.material.uniforms.saturation.value = value
     }
   }
 
-  setSingleColor(value) {
+  setSingleColor(value: string) {
     const color = hexToGL(value).map(val => parseFloat(val.toFixed(3)))
 
     for (let video of this.videoObject.children) {
-      ;(
-        video as THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>
-      ).material.uniforms.singleColorVec.value = color
+      video.material.uniforms.singleColorVec.value = color
     }
   }
 
-  setUseSingleColor(value) {
+  setUseSingleColor(value: boolean) {
     for (let video of this.videoObject.children) {
-      ;(
-        video as THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>
-      ).material.uniforms.useSingleColor.value = value
+      video.material.uniforms.useSingleColor.value = value
     }
   }
 
-  setRenderNthPoint(value) {
+  setRenderNthPoint(value: number) {
     for (let video of this.videoObject.children) {
-      ;(
-        video as THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>
-      ).material.uniforms.renderNthPoint.value = value
+      video.material.uniforms.renderNthPoint.value = value
+    }
+  }
+
+  useNoise(value: boolean) {
+    for (let video of this.videoObject.children) {
+      video.material.uniforms.useNoise.value = value
+    }
+  }
+
+  noiseStrength(value: number) {
+    for (let video of this.videoObject.children) {
+      video.material.uniforms.noiseStrength.value = value
+    }
+  }
+
+  setSeed() {
+    for (let video of this.videoObject.children) {
+      video.material.uniforms.seed1.value = Math.random()
+      video.material.uniforms.seed2.value = Math.random()
+      video.material.uniforms.seed3.value = Math.random()
     }
   }
 }

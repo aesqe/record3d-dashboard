@@ -7,13 +7,14 @@ import livereload from 'rollup-plugin-livereload'
 
 // `npm run build` -> `production` is true
 // `npm run dev` -> `production` is false
-const production = !process.env.ROLLUP_WATCH
+const production = !global?.process?.env?.ROLLUP_WATCH
 
 export default {
-  input: 'src/index.ts',
+  input: 'src/index.tsx',
   output: {
     file: 'public/bundle.js',
-    format: 'iife', // immediately-invoked function expression — suitable for <script> tags
+    format: 'iife', // immediately-invoked function expression — suitable for <script> tags,
+    name: 'r3dThreeJsApp',
     sourcemap: true
   },
   plugins: [
