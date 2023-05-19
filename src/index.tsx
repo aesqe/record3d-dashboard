@@ -1,131 +1,167 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import * as THREE from 'three'
 
 import { Record3DVideo } from './Record3DVideo'
 import { Record3DScene } from './Record3DScene'
-import { hideElements, toggleElements } from './utils'
+import {
+  addClass,
+  hideElements,
+  removeClass,
+  toggleElements,
+  getPeerAddresses
+} from './utils'
 import { WiFiStreamedVideoSource } from './video-sources/WiFiStreamedVideoSource'
 
-const keyListener = (e: KeyboardEvent) => {
-  if (e.key === '0') {
-    toggleElements('#toolbar')
-  }
+const peerAddress = getPeerAddresses()[0]
 
-  const toolbarVisible = !document
-    .querySelector('#toolbar')
-    ?.classList.contains('hidden')
-
-  if (!toolbarVisible) {
-    hideElements('.lil-gui')
-    hideElements('#r3d-video, #r3d-canvas')
-  } else {
-    if (e.key === 'v') {
-      toggleElements('#r3d-video, #r3d-canvas')
-    }
-
-    if (e.key === 'x') {
-      toggleElements('.lil-gui')
-    }
-  }
-}
-
-document.addEventListener('keydown', keyListener)
-
-const getPeerAddresses = () => {
-  const params = new URLSearchParams(window.location.hash.replace('#', ''))
-
-  return (params.get('ips') || '192.168.0.18')
-    .split(',')
-    .filter(Boolean)
-    .map(add => `http://${add}`)
-}
+const wifiVideo = new WiFiStreamedVideoSource(peerAddress)
 
 const scene1 = new Record3DScene(40, 1e-4, 1e5, 'canvas-1')
 const scene2 = new Record3DScene(40, 1e-4, 1e5, 'canvas-2')
+const scene3 = new Record3DScene(40, 1e-4, 1e5, 'canvas-3')
 
 hideElements('.lil-gui, #r3d-video, #r3d-canvas')
+addClass('body', 'scenes-2')
 
 const App = () => {
-  const wifiVideos = useRef<WiFiStreamedVideoSource[]>(
-    [] as WiFiStreamedVideoSource[]
-  )
-  const [peerAddresses, setPeerAddresses] = useState(getPeerAddresses())
   const [playing, setPlaying] = useState(true)
-
-  const hashListener = useCallback(() => {
-    setPeerAddresses(getPeerAddresses())
-  }, [])
+  const [sceneCount, setSceneCount] = useState(2)
+  const previousCount = useRef(sceneCount)
 
   const pauseVideos = useCallback(() => {
     setPlaying(false)
-    wifiVideos.current.forEach(wifiVideo => wifiVideo.videoTag.pause())
+    wifiVideo.videoTag.pause()
   }, [])
 
   const playVideos = useCallback(() => {
     setPlaying(true)
-    wifiVideos.current.forEach(wifiVideo => wifiVideo.videoTag.play())
+    wifiVideo.videoTag.play()
   }, [])
 
-  useEffect(() => {
-    window.addEventListener('hashchange', hashListener)
+  const resizeScenes = useCallback(() => {
+    scene1.onWindowResize()
+    scene2.onWindowResize()
+    scene3.onWindowResize()
+    scene1.camera.lookAt(new THREE.Vector3(0, 0, 0))
+  }, [])
 
-    return () => {
-      window.removeEventListener('hashchange', hashListener)
+  const handleOverlay = useCallback((show: boolean) => {
+    const classFunc = show ? addClass : removeClass
+
+    classFunc('body', 'overlay')
+
+    setTimeout(() => {
+      resizeScenes()
+      classFunc('body', 'overlay-full-width')
+      setTimeout(() => resizeScenes(), 100)
+    }, 100)
+  }, [])
+
+  const showOverlay = useCallback(() => {
+    if (!document.body.classList.contains('overlay')) {
+      handleOverlay(true)
     }
   }, [])
 
-  const runScene = useCallback(async () => {
-    console.log('runScene')
-    wifiVideos.current.forEach(wifiVideo => wifiVideo.disconnect())
-    wifiVideos.current = []
-    scene1.removeVideos()
-    scene2.removeVideos()
+  const hideOverlay = useCallback(() => {
+    if (document.body.classList.contains('overlay')) {
+      handleOverlay(false)
+    }
+  }, [])
 
-    setTimeout(() => {
-      peerAddresses.forEach(peerAddress => {
-        const wifiVideo = new WiFiStreamedVideoSource(peerAddress)
+  const toggleOverlay = useCallback(() => {
+    handleOverlay(!document.body.classList.contains('overlay'))
+  }, [])
 
-        wifiVideos.current.push(wifiVideo)
-        wifiVideo.connect()
+  const keyListener = (e: KeyboardEvent) => {
+    if (e.key === '0') {
+      toggleElements('#toolbar')
+    }
 
-        scene1.addVideo(new Record3DVideo(wifiVideo, 1))
-        scene2.addVideo(new Record3DVideo(wifiVideo, 2))
+    const toolbarVisible = !document
+      .querySelector('#toolbar')
+      ?.classList.contains('hidden')
 
-        hideElements('#r3d-video, #r3d-canvas')
-      })
+    if (!toolbarVisible) {
+      hideElements('.lil-gui')
+      hideElements('#r3d-video, #r3d-canvas')
+    } else {
+      if (e.key === 'v') {
+        toggleElements('#r3d-video, #r3d-canvas')
+      }
 
-      scene1.runLoop()
-      scene2.runLoop()
-    }, 1000)
-  }, [peerAddresses])
+      if (e.key === 'x') {
+        toggleElements('.lil-gui')
+      }
+    }
+
+    if (e.key === '1' || e.key === '2' || e.key === '3') {
+      const count = parseInt(e.key)
+
+      setSceneCount(count)
+
+      removeClass('body', 'scenes-1')
+      removeClass('body', 'scenes-2')
+      removeClass('body', 'scenes-3')
+
+      addClass('body', 'scenes-' + count)
+    }
+
+    if (e.key === 'o') {
+      toggleOverlay()
+    }
+  }
 
   useEffect(() => {
-    runScene()
-  }, [runScene])
+    wifiVideo.connect()
 
-  useEffect(() => {}, [])
+    scene1.addVideo(new Record3DVideo(wifiVideo, 1))
+    scene1.runLoop()
+
+    document.addEventListener('keydown', keyListener)
+
+    return () => {
+      window.removeEventListener('keydown', keyListener)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (sceneCount === 1) {
+      scene2.removeVideos()
+      scene3.removeVideos()
+    } else if (sceneCount === 2) {
+      scene3.removeVideos()
+    }
+
+    if (sceneCount === 2 || previousCount.current === 1) {
+      scene2.addVideo(new Record3DVideo(wifiVideo, 2))
+      scene2.runLoop()
+    }
+
+    if (sceneCount === 3) {
+      scene3.addVideo(new Record3DVideo(wifiVideo, 3))
+      scene3.runLoop()
+    }
+
+    hideElements('#r3d-video, #r3d-canvas')
+
+    resizeScenes()
+
+    previousCount.current = sceneCount
+  }, [sceneCount])
+
+  const resetAll = () => {}
 
   return (
     <div id='toolbar' className='hidden'>
-      <a onClick={runScene} id='button-reset'>
+      <a onClick={resetAll} id='button-reset'>
         Reset
       </a>
-      <a onClick={runScene} id='button-1'>
-        1
-      </a>
-      <a onClick={runScene} id='button-2'>
-        2
-      </a>
-      <a onClick={runScene} id='button-3'>
-        3
-      </a>
-      <a onClick={runScene} id='button-4'>
-        4
-      </a>
-      <a onClick={runScene} id='button-arrange'>
+      <a onClick={hideOverlay} id='button-arrange'>
         Arrange
       </a>
-      <a onClick={runScene} id='button-overlay'>
+      <a onClick={showOverlay} id='button-overlay'>
         Overlay
       </a>
       <a onClick={() => toggleElements('.lil-gui')} id='button-fx'>
@@ -141,7 +177,7 @@ const App = () => {
       >
         Pause
       </a>
-      <div id='slider-noise'>
+      {/* <div id='slider-noise'>
         <input
           type='range'
           min='0'
@@ -164,7 +200,7 @@ const App = () => {
             console.log((e.nativeEvent?.target as HTMLInputElement)?.value)
           }
         />
-      </div>
+      </div> */}
       <div id='preset-list'></div>
     </div>
   )

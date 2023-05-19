@@ -1,10 +1,12 @@
 import { GUI } from 'lil-gui'
 import { Record3DScene } from './Record3DScene'
+import { loadCameraPosition } from './utils'
 
 export type LilGuiPreset = {
   controllers: Record<string, any>
   folders: Record<string, any>
   name: string
+  view: Record<string, any>
 }
 
 export let guiPresets: LilGuiPreset[] = []
@@ -184,8 +186,8 @@ export const guiHelper = (scene: Record3DScene) => {
     })
 
   gui.add(scene.options, 'toggleSound').name('Mute/Unmute')
-  gui.add(scene.options, 'toggleVideo').name('Play/Pause')
   gui.add(scene.options, 'savePreset').name('Save Preset')
+  gui.add(scene.options, 'transparentBackground').name('Transparent background')
 
   gui
     .add(scene.options, 'renderingMode', [
@@ -213,6 +215,8 @@ export const guiHelper = (scene: Record3DScene) => {
 
     if (preset) {
       gui.load(preset)
+
+      loadCameraPosition(scene, preset.view)
     }
   })
 

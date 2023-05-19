@@ -11,6 +11,7 @@ import {
   getGuiPresetsList
 } from './gui-helper'
 import { Record3DVideo } from './Record3DVideo'
+import { getCameraPosition } from './utils'
 
 let then = 0
 
@@ -25,9 +26,14 @@ export class Record3DScene {
   gui: GUI
 
   constructor(fov: number, near: number, far: number, id = 'canvas1') {
+    this.onDocumentKeyDown = this.onDocumentKeyDown.bind(this)
+    this.onWindowResize = this.onWindowResize.bind(this)
+    this.runLoop = this.runLoop.bind(this)
+
     let self = this
     this.mainScene = new THREE.Scene()
-    this.renderer = new THREE.WebGLRenderer()
+    this.mainScene.background = null
+    this.renderer = new THREE.WebGLRenderer({ alpha: true })
     this.renderer.domElement.id = id
 
     // Camera settings
@@ -64,27 +70,18 @@ export class Record3DScene {
       camera.position.sub(_v)
     })
 
-    this.controls.update()
-
-    this.runLoop = this.runLoop.bind(this)
-
     this.pointClouds = []
 
     // Init scene
-    this.renderer.setClearColor(new THREE.Color(0x57554f))
     this.renderer.setPixelRatio(window.devicePixelRatio)
 
     document.body.appendChild(this.renderer.domElement)
 
     // Setup resizing
-    window.addEventListener('resize', this.onWindowResize.bind(this), false)
+    window.addEventListener('resize', this.onWindowResize, false)
     this.onWindowResize()
 
-    document.addEventListener(
-      'keydown',
-      this.onDocumentKeyDown.bind(this),
-      false
-    )
+    document.addEventListener('keydown', this.onDocumentKeyDown)
 
     // Setup UI
     this.options = {
@@ -103,6 +100,10 @@ export class Record3DScene {
       absoluteDepthRangeFilterX: 0.1,
       absoluteDepthRangeFilterY: 2.8,
       renderingMode: 'points',
+      transparentBackground() {
+        self.renderer.domElement.style.backgroundColor = 'transparent'
+        self.renderer.setClearColor(0x000000, 0)
+      },
       savePreset() {
         const rnd = Math.random() * 1000 * Date.now()
         const presetName = prompt(
@@ -113,6 +114,8 @@ export class Record3DScene {
         if (presetName) {
           const preset = self.gui.save() as LilGuiPreset
           preset.name = presetName
+          preset.view = getCameraPosition(self)
+
           addGuiPreset(preset)
 
           console.log(
@@ -125,9 +128,6 @@ export class Record3DScene {
       },
       toggleSound: () => {
         for (let video of self.pointClouds) video.toggleSound()
-      },
-      toggleVideo: () => {
-        for (let video of self.pointClouds) video.toggle()
       }
     }
 
@@ -168,26 +168,21 @@ export class Record3DScene {
     }
   }
 
-  resizeRendererToDisplaySize() {
+  onWindowResize() {
     const canvas = this.renderer.domElement
     const width = canvas.clientWidth
     const height = canvas.clientHeight
     const needResize = canvas.width !== width || canvas.height !== height
 
     if (needResize) {
-      this.composer.setSize(canvas.width, canvas.height)
+      this.composer.setSize(width, height)
       this.renderer.setSize(width, height, false)
-    }
-
-    return needResize
-  }
-
-  onWindowResize() {
-    if (this.resizeRendererToDisplaySize()) {
-      const canvas = this.renderer.domElement
-      this.camera.aspect = canvas.clientWidth / canvas.clientHeight
+      this.camera.aspect = width / height
       this.camera.updateProjectionMatrix()
-      this.composer.setSize(canvas.width, canvas.height)
+      const ratio = Math.ceil(window.devicePixelRatio)
+      canvas.width = width * ratio
+      canvas.height = height * ratio
+      this.controls.update()
     }
   }
 
@@ -216,6 +211,7 @@ export class Record3DScene {
       this.camera.position.y = 0.0
       this.camera.position.z = 1.0
       this.camera.lookAt(new THREE.Vector3(0, 0, 0))
+      this.controls.update()
     } else if (keyCode === 'q') {
       this.camera.rotateX(0.1)
     } else if (keyCode === 'e') {
@@ -229,9 +225,5 @@ export class Record3DScene {
     } else if (keyCode === 'W') {
       this.camera.rotateY(-0.1)
     }
-
-    this.controls.update()
-
-    console.log(event)
   }
 }

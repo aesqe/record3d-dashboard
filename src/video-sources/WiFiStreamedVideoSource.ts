@@ -61,6 +61,12 @@ export class WiFiStreamedVideoSource {
     this.updateFrameImageData = this.updateFrameImageData.bind(this)
     this.onVideoFrame = this.onVideoFrame.bind(this)
 
+    const existingVideo = document.getElementById(this.videoTag.id)
+    const existingCanvas = document.getElementById(this.canvas.id)
+
+    existingVideo?.parentElement?.removeChild(existingVideo)
+    existingCanvas?.parentElement?.removeChild(existingCanvas)
+
     document.body.appendChild(this.videoTag)
     document.body.appendChild(this.canvas)
 
@@ -68,25 +74,13 @@ export class WiFiStreamedVideoSource {
 
     const terminationEvent = 'onpagehide' in window ? 'pagehide' : 'unload'
 
-    window.addEventListener(
-      terminationEvent,
-      () => {
-        self.peerConnection?.close()
-      },
-      {
-        capture: true
-      }
-    )
+    window.addEventListener(terminationEvent, () => self.disconnect(), {
+      capture: true
+    })
 
-    window.addEventListener(
-      'beforeunload',
-      () => {
-        self.peerConnection?.close()
-      },
-      {
-        capture: true
-      }
-    )
+    window.addEventListener('beforeunload', () => self.disconnect(), {
+      capture: true
+    })
   }
 
   async onVideoFrame(now = then, metadata?: VideoFrameCallbackMetadata) {
@@ -106,6 +100,7 @@ export class WiFiStreamedVideoSource {
       this.onVideoFrameCallback()
       then = now
     }
+
     this.videoTag.requestVideoFrameCallback(this.onVideoFrame)
   }
 
@@ -116,12 +111,15 @@ export class WiFiStreamedVideoSource {
     if (this.canvas.width && this.canvas.height) {
       this.ctx.drawImage(this.videoTag, 0, 0)
 
-      this.imageData = this.ctx.getImageData(
-        0,
-        0,
-        this.canvas.width / 2,
-        this.canvas.height
-      )
+      try {
+        const data = this.ctx.getImageData(
+          0,
+          0,
+          this.canvas.width / 2,
+          this.canvas.height
+        )
+        this.imageData = data
+      } catch (error) {}
     }
   }
 

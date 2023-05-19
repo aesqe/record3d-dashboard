@@ -1,5 +1,6 @@
 import 'rvfc-polyfill'
 import * as THREE from 'three'
+import { Record3DScene } from './Record3DScene'
 
 export const hexToGL = (hexStr: string) => new THREE.Color(hexStr).toArray()
 
@@ -96,6 +97,21 @@ export const getPixelObjectCoords = (
   )
 }
 
+export const addClass = (selector: string, className: string) =>
+  document.querySelectorAll(selector).forEach(element => {
+    element.classList.add(className)
+  })
+
+export const removeClass = (selector: string, className: string) =>
+  document.querySelectorAll(selector).forEach(element => {
+    element.classList.remove(className)
+  })
+
+export const toggleClass = (selector: string, className: string) =>
+  document.querySelectorAll(selector).forEach(element => {
+    element.classList.toggle(className)
+  })
+
 export const showElements = (selector: string) =>
   document.querySelectorAll(selector).forEach(element => {
     element.classList.remove('hidden')
@@ -110,3 +126,53 @@ export const toggleElements = (selector: string) =>
   document.querySelectorAll(selector).forEach(element => {
     element.classList.toggle('hidden')
   })
+
+export const getPeerAddresses = () => {
+  const params = new URLSearchParams(window.location.hash.replace('#', ''))
+
+  return (params.get('ips') || '192.168.0.18')
+    .split(',')
+    .filter(Boolean)
+    .map(add => `http://${add}`)
+}
+
+export const getCameraPosition = (scene: Record3DScene) => {
+  const { position, rotation } = scene.camera
+  const { target } = scene.controls
+
+  return {
+    camera: {
+      position: {
+        x: position.x,
+        y: position.y,
+        z: position.z
+      },
+      rotation: {
+        x: rotation.x,
+        y: rotation.y,
+        z: rotation.z
+      }
+    },
+    controls: {
+      target: {
+        x: target.x,
+        y: target.y,
+        z: target.z
+      }
+    }
+  }
+}
+
+export const loadCameraPosition = (scene: Record3DScene, data: any) => {
+  scene.camera.position.x = data.camera.position.x
+  scene.camera.position.y = data.camera.position.y
+  scene.camera.position.z = data.camera.position.z
+
+  scene.camera.rotation.x = data.camera.rotation.x
+  scene.camera.rotation.y = data.camera.rotation.y
+  scene.camera.rotation.z = data.camera.rotation.z
+
+  scene.controls.target.x = data.controls.target.x
+  scene.controls.target.y = data.controls.target.y
+  scene.controls.target.z = data.controls.target.z
+}
