@@ -1,3 +1,4 @@
+import 'rvfc-polyfill'
 import * as THREE from 'three'
 
 export const hexToGL = (hexStr: string) => new THREE.Color(hexStr).toArray()
@@ -94,3 +95,18 @@ export const getPixelObjectCoords = (
     -currDepth
   )
 }
+
+export const showElements = (selector: string) =>
+  document.querySelectorAll(selector).forEach(element => {
+    element.classList.remove('hidden')
+  })
+
+export const hideElements = (selector: string) =>
+  document.querySelectorAll(selector).forEach(element => {
+    element.classList.add('hidden')
+  })
+
+export const toggleElements = (selector: string) =>
+  document.querySelectorAll(selector).forEach(element => {
+    element.classList.toggle('hidden')
+  })

@@ -1,25 +1,182 @@
 body {
-    position: relative;
-    text-shadow: 0 .05rem .1rem rgba(0, 0, 0, .5);
-    box-shadow: inset 0 0 5rem rgba(0, 0, 0, .5);
+  background: #57554f;
+  position: relative;
+  flex-direction: row-reverse;
+  overflow: hidden;
 }
 
-#play-btn-container
-{
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
+.hidden {
+  opacity: 0;
+  pointer-events: none;
 }
 
-canvas
-{
-    width: 50%;
-    height: 100%;
-    display: block;
+.active {
+  background-color: #948f89 !important;
+}
+
+#play-btn-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+canvas {
+  width: calc(50% - 31px);
+  height: 100%;
+  display: block;
+}
+
+video {
+  max-width: 320px;
+  width: auto;
+  height: auto;
+}
+
+#canvas-1 {
+  width: calc(50% - 33px);
+  border-left: 2px solid #ffffff;
+}
+
+#canvas-2 {
+  margin-left: auto;
+}
+
+#gui-canvas-2 {
+  left: 0px;
+  right: auto;
 }
 
 #gui-canvas-1 {
-    left: 15px;
-    right: auto;
+  left: calc(50% - 58px);
+  right: auto;
+}
+
+#r3d-video {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+#r3d-canvas {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: auto;
+  width: auto;
+}
+
+#toolbar {
+  width: 60px;
+  height: 100%;
+  border-left: 2px solid #ffffff;
+  position: absolute;
+  right: 0;
+  top: 0;
+  background: #57554f88;
+}
+
+#toolbar a {
+  width: 60px;
+  height: 60px;
+  border: none;
+  border-bottom: 2px solid #fff;
+  background: transparent no-repeat center center;
+  padding: 0;
+  display: block;
+  margin: 0;
+  outline: none;
+  cursor: pointer;
+  color: #ffffff;
+  text-align: center;
+  line-height: 56px;
+  font-weight: bold;
+}
+
+#toolbar a:hover {
+  background-color: rgb(113, 104, 93);
+}
+
+#toolbar div {
+  border-bottom: 2px solid #fff;
+}
+
+#toolbar input {
+  transform: rotate(-90deg);
+  width: 90px;
+  height: 60px;
+  margin: 15px -30px;
+}
+
+#slider-noise {
+  padding: 15px;
+  height: 120px;
+}
+
+#slider-pointsize {
+  padding: 15px;
+}
+
+#toolbar a#button-reset {
+  background-image: url(../images/reset.svg);
+  color: transparent;
+}
+
+#toolbar a#button-arrange {
+  background-image: url(../images/arrange.svg);
+  color: transparent;
+}
+
+#toolbar a#button-overlay {
+  background-image: url(../images/overlay.svg);
+  color: transparent;
+}
+
+#toolbar a#button-fx {
+  background-image: url(../images/fx.svg);
+  color: transparent;
+}
+
+#toolbar a#button-play {
+  background-image: url(../images/play.svg);
+  color: transparent;
+}
+#toolbar a#button-pause {
+  background-image: url(../images/pause.svg);
+  color: transparent;
+}
+
+/* slider */
+input[type='range'] {
+  -webkit-appearance: none;
+  background: transparent;
+}
+input[type='range']:focus {
+  outline: none;
+}
+input[type='range']::-webkit-slider-runnable-track {
+  -webkit-appearance: none;
+  width: 42px;
+  cursor: pointer;
+  background: #e3e3e3;
+  border-radius: 25px;
+  border: 1px solid #999;
+}
+input[type='range']::-webkit-slider-thumb {
+  border: 1px solid #e3e3e3;
+  background: #333;
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  border-radius: 25px;
+  -webkit-appearance: none;
+}
+input[type='range']:focus::-webkit-slider-runnable-track {
+  background: #e3e3e3;
+}
+
+#camera-angles {
+  position: absolute;
+  top: 0;
+  left: 0;
 }

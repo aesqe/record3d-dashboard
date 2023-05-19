@@ -16,7 +16,7 @@ void main() {
   int vertIdx = int(vVertexIdx);
   int actualNumPts = frameSize.x * frameSize.y;
 
-  if(vShouldDiscard != 0.0 || vertIdx >= actualNumPts) {
+  if (vShouldDiscard != 0.0 || vertIdx >= actualNumPts) {
     discard;
   }
 

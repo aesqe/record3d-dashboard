@@ -15,12 +15,12 @@ uniform float seed2;
 uniform float seed3;
 uniform bool useNoise;
 uniform float noiseStrength;
-uniform float transitionTime;
+uniform float depthThresholdFilter;
+uniform float absoluteDepthRangeFilterX;
+uniform float absoluteDepthRangeFilterY;
 
 // Filtering constants
 const int filterSize = 1;
-const float depthThresholdFilter = 0.005; // In meters. Smaller values = more aggressive filtering
-const vec2 absoluteDepthRangeFilter = vec2(0.1, 2.8);
 
 float random(vec2 st, float seed) {
   return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) *
@@ -54,7 +54,7 @@ bool shouldDiscard(ivec2 currPixel, int vertIdx) {
 
       float currDepth = getPixelDepth(currPixel + ivec2(j, i));
 
-      if (currDepth < absoluteDepthRangeFilter.x || currDepth >= absoluteDepthRangeFilter.y || abs(centerPixelDepth - currDepth) > depthThresholdFilter) {
+      if (currDepth < absoluteDepthRangeFilterX || currDepth >= absoluteDepthRangeFilterY || abs(centerPixelDepth - currDepth) > depthThresholdFilter) {
         return true;
       }
     }
@@ -90,15 +90,15 @@ void main() {
     return;
   }
 
-  float currDepth = getPixelDepth(pt) * 2.0;
+  float currDepth = getPixelDepth(pt);
 
-  vec3 coords = vec3((iK.x * float(ptX) + iK.z) * currDepth, (iK.y * float(ptY) + iK.w) * currDepth, -currDepth);
+  vec3 coords = scale * vec3((iK.x * float(ptX) + iK.z) * currDepth, (iK.y * float(ptY) + iK.w) * currDepth, -currDepth);
 
   float noisex = useNoise ? random(vec2(coords.x, coords.y), seed1) : 0.0;
   float noisey = useNoise ? random(vec2(coords.y, coords.z), seed2) : 0.0;
   float noisez = useNoise ? random(vec2(coords.z, coords.x), seed3) : 0.0;
 
-  vec3 ptPos = scale * (vec3(coords.x + noisex, coords.y + noisey, coords.z + noisez));
+  vec3 ptPos = vec3(coords.x + noisex, coords.y + noisey, coords.z + noisez);
 
   vec4 mvPos = modelViewMatrix * vec4(ptPos, 1.0);
   gl_Position = projectionMatrix * mvPos;

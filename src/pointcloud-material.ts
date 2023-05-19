@@ -3,10 +3,10 @@ import * as THREE from 'three'
 import { hexToGL } from './utils'
 
 export const getPointCloudShaderMaterial = async (version = 1) => {
-  const vertexShaderSrc = await fetch(`./shaders/vertex-${version}.glsl`)
+  const vertexShaderSrc = await fetch(`./shaders/vertex.glsl`)
   const vertexShader = await vertexShaderSrc.text()
 
-  const fragmentShaderSrc = await fetch(`./shaders/fragment-${version}.glsl`)
+  const fragmentShaderSrc = await fetch(`./shaders/fragment.glsl`)
   const fragmentShader = await fragmentShaderSrc.text()
 
   return new THREE.ShaderMaterial({
@@ -25,13 +25,17 @@ export const getPointCloudShaderMaterial = async (version = 1) => {
       seed2: { type: 'f', value: Math.random() },
       seed3: { type: 'f', value: Math.random() },
       useNoise: { type: 'b', value: false },
-      noiseStrength: { type: 'f', value: 0.0 }
+      noiseStrength: { type: 'f', value: 0.0 },
+      depthThresholdFilter: { type: 'f', value: 1.0 },
+      absoluteDepthRangeFilterX: { type: 'f', value: 0.1 },
+      absoluteDepthRangeFilterY: { type: 'f', value: 2.8 }
     } as Record<string, THREE.IUniform>,
     side: THREE.DoubleSide,
     transparent: true,
-    alphaTest: 0,
-    depthTest: true,
     vertexShader: vertexShader,
-    fragmentShader: fragmentShader
+    fragmentShader: fragmentShader,
+    alphaTest: 0,
+    depthTest: false,
+    depthWrite: false
   })
 }

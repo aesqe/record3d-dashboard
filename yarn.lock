@@ -3777,6 +3777,11 @@ levn@^0.4.1:
     prelude-ls "^1.2.1"
     type-check "~0.4.0"
 
+lil-gui@^0.18.1:
+  version "0.18.1"
+  resolved "https://registry.yarnpkg.com/lil-gui/-/lil-gui-0.18.1.tgz#879035a72400d458ef4ec41e0f7ca4fd690875b2"
+  integrity sha512-nsDJLflFGro81hcGqaiDNBEKgkMKNF9okmMmW3Xc6sPXP1zyfD3oIftyctvBQD2iTIUgWDw6CuME1IQZD+OvLw==
+
 lil-gui@~0.17.0:
   version "0.17.0"
   resolved "https://registry.yarnpkg.com/lil-gui/-/lil-gui-0.17.0.tgz#b41ae55d0023fcd9185f7395a218db0f58189663"
@@ -5412,6 +5417,11 @@ run-parallel@^1.1.9:
   integrity sha512-5l4VyZR86LZ/lDxZTR6jqL8AFE2S0IFLMP26AbjsLVADxHdhB/c0GUsH+y39UfCi3dzz8OlQuPmnaJOMoDHQBA==
   dependencies:
     queue-microtask "^1.2.2"
+
+rvfc-polyfill@^1.0.6:
+  version "1.0.6"
+  resolved "https://registry.yarnpkg.com/rvfc-polyfill/-/rvfc-polyfill-1.0.6.tgz#da278efb361a4fb35b0de8834217d8669517840a"
+  integrity sha512-y7tu9Bh19CTnzBZWEQEEEo5UYvhVi5Ud9C3ndeWtm9m+tUO5vK8qqbpAMJfEDgRSFZokrVHmehnhGjd9LyazBg==
 
 rxjs@^6.3.3, rxjs@^6.6.0:
   version "6.6.7"

@@ -1,13 +1,16 @@
 import * as THREE from 'three'
+import GUI from 'lil-gui'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
-import { BloomPass } from 'three/examples/jsm/postprocessing/BloomPass.js'
-import { FilmPass } from 'three/examples/jsm/postprocessing/FilmPass.js'
-import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js'
 
-import { guiHelper } from './gui-helper.js'
-import { Record3DVideo } from './Record3DVideo.js'
+import {
+  guiHelper,
+  addGuiPreset,
+  LilGuiPreset,
+  getGuiPresetsList
+} from './gui-helper'
+import { Record3DVideo } from './Record3DVideo'
 
 let then = 0
 
@@ -36,32 +39,39 @@ export class Record3DScene {
     )
     this.camera.position.x = 0.0
     this.camera.position.y = 0.0
-    this.camera.position.z = 0.2
+    this.camera.position.z = 1.0
     this.camera.lookAt(new THREE.Vector3(0, 0, 0))
 
     this.composer = new EffectComposer(this.renderer)
     this.composer.addPass(new RenderPass(this.mainScene, this.camera))
 
-    const filmPass = new FilmPass(
-      0.75, // noise intensity
-      0.25, // scanline intensity
-      648, // scanline count
-      1.0 // grayscale
-    )
-    filmPass.renderToScreen = true
-
-    // this.composer.addPass(filmPass)
-
     // Camera control settings
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
     this.controls.enableZoom = true
-    this.controls.update()
     this.controls.target.set(0, 0, 0)
+
+    var minPan = new THREE.Vector3(-2, -2, -2)
+    var maxPan = new THREE.Vector3(2, 2, 2)
+    var _v = new THREE.Vector3()
+
+    const controls = this.controls
+    const camera = this.camera
+
+    controls.addEventListener('change', function () {
+      _v.copy(controls.target)
+      controls.target.clamp(minPan, maxPan)
+      _v.sub(controls.target)
+      camera.position.sub(_v)
+    })
+
+    this.controls.update()
+
+    this.runLoop = this.runLoop.bind(this)
 
     this.pointClouds = []
 
     // Init scene
-    this.renderer.setClearColor(new THREE.Color(0x343a40))
+    this.renderer.setClearColor(new THREE.Color(0x57554f))
     this.renderer.setPixelRatio(window.devicePixelRatio)
 
     document.body.appendChild(this.renderer.domElement)
@@ -69,6 +79,12 @@ export class Record3DScene {
     // Setup resizing
     window.addEventListener('resize', this.onWindowResize.bind(this), false)
     this.onWindowResize()
+
+    document.addEventListener(
+      'keydown',
+      this.onDocumentKeyDown.bind(this),
+      false
+    )
 
     // Setup UI
     this.options = {
@@ -81,6 +97,32 @@ export class Record3DScene {
       renderNthPoint: 1,
       useNoise: false,
       noiseStrength: 0.0,
+      presetName: 'None',
+      backgroundColor: '#57554f',
+      depthThresholdFilter: 1.0,
+      absoluteDepthRangeFilterX: 0.1,
+      absoluteDepthRangeFilterY: 2.8,
+      renderingMode: 'points',
+      savePreset() {
+        const rnd = Math.random() * 1000 * Date.now()
+        const presetName = prompt(
+          'Please enter preset name',
+          `New Preset ${parseInt(rnd.toString())}`
+        )
+
+        if (presetName) {
+          const preset = self.gui.save() as LilGuiPreset
+          preset.name = presetName
+          addGuiPreset(preset)
+
+          console.log(
+            self.gui.controllers.find(c => c.property === 'presetName')
+          )
+          self.gui.controllers
+            .find(c => c.property === 'presetName')
+            ?.setValue(getGuiPresetsList())
+        }
+      },
       toggleSound: () => {
         for (let video of self.pointClouds) video.toggleSound()
       },
@@ -90,7 +132,6 @@ export class Record3DScene {
     }
 
     this.gui = guiHelper(self)
-
     this.gui.domElement.id = `gui-${id}`
   }
 
@@ -111,14 +152,14 @@ export class Record3DScene {
     const deltaTime = now - then
     then = now
 
-    if (Math.random() > 0.0) {
+    if (Math.random() > 1.8) {
       for (let ptCloud of this.pointClouds) {
         ptCloud.setSeed()
       }
     }
 
     this.composer.render(deltaTime)
-    requestAnimationFrame(this.runLoop.bind(this))
+    requestAnimationFrame(this.runLoop)
   }
 
   toggleSound() {
@@ -128,14 +169,13 @@ export class Record3DScene {
   }
 
   resizeRendererToDisplaySize() {
-    // https://threejsfundamentals.org/threejs/lessons/threejs-responsive.html
     const canvas = this.renderer.domElement
     const width = canvas.clientWidth
     const height = canvas.clientHeight
     const needResize = canvas.width !== width || canvas.height !== height
 
     if (needResize) {
-      // this.composer.setSize(canvas.width, canvas.height)
+      this.composer.setSize(canvas.width, canvas.height)
       this.renderer.setSize(width, height, false)
     }
 
@@ -149,5 +189,49 @@ export class Record3DScene {
       this.camera.updateProjectionMatrix()
       this.composer.setSize(canvas.width, canvas.height)
     }
+  }
+
+  onDocumentKeyDown(event: KeyboardEvent) {
+    const keyCode = event.key
+    const shiftKey = event
+
+    if (keyCode === 'ArrowUp') {
+      if (shiftKey) {
+        this.camera.position.setY(this.camera.position.y + 0.1)
+      } else {
+        this.camera.position.setZ(this.camera.position.z + 0.1)
+      }
+    } else if (keyCode === 'ArrowDown') {
+      if (shiftKey) {
+        this.camera.position.setY(this.camera.position.y - 0.1)
+      } else {
+        this.camera.position.setZ(this.camera.position.z - 0.1)
+      }
+    } else if (keyCode === 'ArrowRight') {
+      this.camera.position.setX(this.camera.position.x + 0.1)
+    } else if (keyCode === 'ArrowLeft') {
+      this.camera.position.setX(this.camera.position.x - 0.1)
+    } else if (keyCode === 'R' && shiftKey) {
+      this.camera.position.x = 0.0
+      this.camera.position.y = 0.0
+      this.camera.position.z = 1.0
+      this.camera.lookAt(new THREE.Vector3(0, 0, 0))
+    } else if (keyCode === 'q') {
+      this.camera.rotateX(0.1)
+    } else if (keyCode === 'e') {
+      this.camera.rotateZ(0.1)
+    } else if (keyCode === 'w') {
+      this.camera.rotateY(0.1)
+    } else if (keyCode === 'Q') {
+      this.camera.rotateX(-0.1)
+    } else if (keyCode === 'E') {
+      this.camera.rotateZ(-0.1)
+    } else if (keyCode === 'W') {
+      this.camera.rotateY(-0.1)
+    }
+
+    this.controls.update()
+
+    console.log(event)
   }
 }

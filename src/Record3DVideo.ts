@@ -1,23 +1,40 @@
 import * as THREE from 'three'
-import { getPointCloudShaderMaterial } from './pointcloud-material.js'
-import { WiFiStreamedVideoSource } from './video-sources/WiFiStreamedVideoSource.js'
-import { hexToGL } from './utils.js'
+import { getPointCloudShaderMaterial } from './pointcloud-material'
+import { WiFiStreamedVideoSource } from './video-sources/WiFiStreamedVideoSource'
+import { hexToGL } from './utils'
 
 interface VideoObject extends THREE.Group {
   children: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>[]
 }
+interface Spheres extends THREE.Group {
+  children: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>[]
+}
 
 export class Record3DVideo {
-  material: THREE.ShaderMaterial | null
-  videoSource: WiFiStreamedVideoSource | null
+  material: THREE.ShaderMaterial
+  videoSource: WiFiStreamedVideoSource
   videoObject: VideoObject
+  spheres: Spheres
+  sphereMesh: THREE.InstancedMesh
   id: number
+  vertexIdx: THREE.Float32BufferAttribute
+  geometryIndex: THREE.Uint32BufferAttribute
+  spheresCount: number
+  dummy: THREE.Object3D
+  renderingMode: string
 
   constructor(videoSource: WiFiStreamedVideoSource, id: number) {
     this.id = id
-    this.videoSource = null
-    this.material = null
+    this.videoSource = {} as WiFiStreamedVideoSource
+    this.material = {} as THREE.ShaderMaterial
     this.videoObject = new THREE.Group() as VideoObject
+    this.spheres = new THREE.Group() as Spheres
+    this.sphereMesh = {} as THREE.InstancedMesh
+    this.vertexIdx = {} as THREE.Float32BufferAttribute
+    this.geometryIndex = {} as THREE.Uint32BufferAttribute
+    this.spheresCount = 1000
+    this.renderingMode = 'points'
+    this.dummy = {} as THREE.Object3D
 
     this.setVideoSource(videoSource)
   }
@@ -25,16 +42,17 @@ export class Record3DVideo {
   async setVideoSource(videoSource: WiFiStreamedVideoSource) {
     this.material = await getPointCloudShaderMaterial()
 
-    if (videoSource !== this.videoSource) {
-      this.videoSource = videoSource
+    this.videoSource = videoSource
 
-      const existingChangeHandler = videoSource.onVideoChange
-      const changeHandler = this.onVideoTagChanged.bind(this)
+    const existingChangeHandler = videoSource.onVideoChange
+    const changeHandler = this.onVideoTagChanged.bind(this)
 
-      videoSource.onVideoChange = () => {
+    videoSource.onVideoChange = () => {
+      if (existingChangeHandler && existingChangeHandler !== changeHandler) {
         existingChangeHandler?.()
-        changeHandler()
       }
+
+      changeHandler()
     }
   }
 
@@ -43,32 +61,89 @@ export class Record3DVideo {
       this.videoObject.remove(this.videoObject.children[0])
     }
 
+    this.videoSource.onVideoFrameCallback = () => {}
+
+    switch (this.renderingMode) {
+      case 'mesh':
+        this.renderMesh(false)
+        break
+      case 'mesh-wireframe':
+        this.renderMesh(true)
+        break
+      case 'spheres':
+        this.renderInstancedSpheres()
+        break
+      default:
+        this.renderPointCloud()
+        break
+    }
+  }
+
+  renderPointCloud() {
     const geometry = new THREE.BufferGeometry()
-    const material = this.material as THREE.ShaderMaterial
-    const videoSource = this.videoSource as WiFiStreamedVideoSource
+    const videoSize = this.videoSource.getVideoSize()
 
-    const numPoints = videoSource.getNumPoints()
-    const bufferIndices = new Array(numPoints).fill(0).map((_, i) => i)
-    const vertexIdx = new THREE.Float32BufferAttribute(bufferIndices, 3)
-    const geometryIndex = new THREE.Uint32BufferAttribute(bufferIndices, 3)
+    const bufferIndices = new Array(videoSize.width * videoSize.height)
+      .fill(0)
+      .map((_, i) => i)
+    this.vertexIdx = new THREE.Float32BufferAttribute(bufferIndices, 1)
+    this.geometryIndex = new THREE.Uint32BufferAttribute(bufferIndices, 1)
 
-    const { videoElement } = videoSource
-    const newVideoWidth = videoElement.videoWidth * 2
-    const newVideoHeight = videoElement.videoHeight * 2
-    const videoTexture = new THREE.VideoTexture(videoElement)
+    const newVideoWidth = videoSize.width * 2
+    const newVideoHeight = videoSize.height
+    const videoTexture = new THREE.VideoTexture(this.videoSource.videoTag)
 
-    videoElement.play()
+    this.videoSource.videoTag.play()
 
+    this.material.uniforms.iK.value = this.videoSource.getIKValue()
+    this.material.uniforms.texImg.value = videoTexture
+    this.material.uniforms.texSize.value = [newVideoWidth, newVideoHeight]
+
+    geometry.setAttribute('vertexIdx', this.vertexIdx)
+    geometry.setIndex(this.geometryIndex)
+    geometry.computeBoundingSphere()
+    geometry.computeVertexNormals()
+
+    const points = new THREE.Points(geometry, this.material)
+
+    points.frustumCulled = false
+
+    this.videoObject.add(points)
+  }
+
+  renderMesh(wireFrame = false) {
+    let videoSource = this.videoSource
+
+    const videoTexture = new THREE.VideoTexture(videoSource.videoTag)
     videoTexture.minFilter = THREE.LinearFilter
     videoTexture.magFilter = THREE.LinearFilter
     videoTexture.format = THREE.RGBAFormat
-    videoTexture.mapping = THREE.CubeReflectionMapping
 
-    material.uniforms.iK.value = videoSource.getIKValue()
-    material.uniforms.texImg.value = videoTexture
-    material.uniforms.texSize.value = [newVideoWidth, newVideoHeight]
+    videoSource.videoTag.play()
 
-    const videoSize = videoSource.getVideoSize()
+    let newVideoWidth = videoSource.videoTag.videoWidth
+    let newVideoHeight = videoSource.videoTag.videoHeight
+    this.material.uniforms.texSize.value = [newVideoWidth, newVideoHeight]
+    this.material.uniforms.texImg.value = videoTexture
+
+    this.material.uniforms.iK.value = this.videoSource.getIKValue()
+
+    const videoSize = this.videoSource.getVideoSize()
+
+    if (videoSize.width === 0 || videoSize.height === 0) {
+      return
+    }
+
+    let numPoints = videoSize.width * videoSize.height
+    const buffIndices = new Uint32Array(
+      (videoSize.width - 1) * (videoSize.height - 1) * 6
+    )
+    const buffPointIndicesAttr = new Float32Array(numPoints)
+
+    for (let ptIdx = 0; ptIdx < numPoints; ptIdx++) {
+      buffPointIndicesAttr[ptIdx] = parseFloat(ptIdx.toString())
+    }
+
     var indicesIdx = 0
     let numRows = videoSize.height
     let numCols = videoSize.width
@@ -80,28 +155,31 @@ export class Record3DVideo {
         let blIdx = row * numCols + col
         let brIdx = blIdx + 1
 
-        bufferIndices[indicesIdx++] = blIdx
-        bufferIndices[indicesIdx++] = trIdx
-        bufferIndices[indicesIdx++] = tlIdx
+        buffIndices[indicesIdx++] = blIdx
+        buffIndices[indicesIdx++] = trIdx
+        buffIndices[indicesIdx++] = tlIdx
 
-        bufferIndices[indicesIdx++] = blIdx
-        bufferIndices[indicesIdx++] = brIdx
-        bufferIndices[indicesIdx++] = trIdx
+        buffIndices[indicesIdx++] = blIdx
+        buffIndices[indicesIdx++] = brIdx
+        buffIndices[indicesIdx++] = trIdx
       }
     }
 
-    geometry.setAttribute('vertexIdx', vertexIdx)
-    geometry.setIndex(geometryIndex)
-    geometry.computeBoundingSphere()
-    geometry.computeVertexNormals()
+    let geometry = new THREE.BufferGeometry()
+    geometry.setAttribute(
+      'vertexIdx',
+      new THREE.Float32BufferAttribute(buffPointIndicesAttr, 1)
+    )
+    geometry.setIndex(
+      new THREE.Uint32BufferAttribute(new Uint32Array(buffIndices), 1)
+    )
 
-    const points = new THREE.Points(geometry, material)
-    const MESH = new THREE.Mesh(geometry, material)
+    let mesh = new THREE.Mesh(geometry, this.material)
+    mesh.frustumCulled = false
+    this.material.wireframe = wireFrame
+    this.videoObject.add(mesh)
 
-    points.frustumCulled = false
-
-    this.videoObject.add(points)
-    this.videoObject.add(MESH)
+    console.log(this.material.uniforms.texSize.value)
   }
 
   /** MODIFIERS */
@@ -158,6 +236,24 @@ export class Record3DVideo {
     }
   }
 
+  setDepthThresholdFilter(value: number) {
+    for (let video of this.videoObject.children) {
+      video.material.uniforms.depthThresholdFilter.value = value
+    }
+  }
+
+  setAbsoluteDepthRangeFilterX(value: number) {
+    for (let video of this.videoObject.children) {
+      video.material.uniforms.absoluteDepthRangeFilterX.value = value
+    }
+  }
+
+  setAbsoluteDepthRangeFilterY(value: number) {
+    for (let video of this.videoObject.children) {
+      // video.material.uniforms.absoluteDepthRangeFilterY.value = value
+    }
+  }
+
   useNoise(value: boolean) {
     for (let video of this.videoObject.children) {
       video.material.uniforms.useNoise.value = value
@@ -172,9 +268,57 @@ export class Record3DVideo {
 
   setSeed() {
     for (let video of this.videoObject.children) {
-      video.material.uniforms.seed1.value = Math.random()
-      video.material.uniforms.seed2.value = Math.random()
-      video.material.uniforms.seed3.value = Math.random()
+      video.material.uniforms.seed1.value = Math.random() / 10
+      video.material.uniforms.seed2.value = Math.random() / 10
+      video.material.uniforms.seed3.value = Math.random() / 10
     }
   }
+
+  /** SPHERES */
+
+  renderInstancedSpheres() {
+    console.log('renderInstancedSpheres')
+
+    this.videoSource.onVideoFrameCallback =
+      this.updateInstancedSpherePositions.bind(this)
+
+    this.dummy = new THREE.Object3D()
+    const sphereGeometry = new THREE.SphereGeometry(0.01, 4, 4)
+    const sphereMaterial = new THREE.MeshBasicMaterial({
+      color: '#ff0000',
+      transparent: true,
+      opacity: 0.25
+    })
+
+    this.sphereMesh = new THREE.InstancedMesh(
+      sphereGeometry,
+      sphereMaterial,
+      this.spheresCount
+    )
+
+    this.videoObject.add(this.sphereMesh)
+
+    for (let ptIdx = 0; ptIdx < this.spheresCount; ptIdx++) {
+      this.dummy.position.set(Math.random(), Math.random(), Math.random())
+      this.dummy.updateMatrix()
+
+      this.sphereMesh.setMatrixAt(ptIdx, this.dummy.matrix)
+    }
+  }
+
+  updateInstancedSpherePositions() {
+    console.log('updateInstancedSpherePositions')
+
+    for (let ptIdx = 0; ptIdx < this.spheresCount; ptIdx++) {
+      const { x, y, z } = this.videoSource.getPoint(ptIdx)
+
+      console.log('in')
+      this.dummy.position.set(Math.random(), Math.random(), Math.random())
+      this.dummy.updateMatrix()
+
+      this.sphereMesh.setMatrixAt(ptIdx, this.dummy.matrix)
+    }
+  }
+
+  addSpheres() {}
 }
