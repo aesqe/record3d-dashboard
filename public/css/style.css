@@ -215,3 +215,34 @@ input[type='range']:focus::-webkit-slider-runnable-track {
   top: 0;
   left: 0;
 }
+
+#separator-1,
+#separator-2 {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 2px;
+  background: #ffffff;
+}
+
+#separator-1 {
+  left: 50%;
+}
+
+#separator-2 {
+  left: calc(100% / 1.5);
+}
+
+.scenes-1 #separator-1,
+.scenes-1 #separator-2 {
+  display: none;
+}
+
+.scenes-2 #separator-2 {
+  display: none;
+}
+
+.scenes-3 #separator-1 {
+  left: calc(100% / 3);
+}

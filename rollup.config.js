@@ -22,7 +22,7 @@ export default {
     commonjs(), // converts date-fns to ES modules
     ts(), // typescript
     serve('public'),
-    livereload(),
+    !production && livereload(),
     production && terser() // minify, but only in production
   ]
 }

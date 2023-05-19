@@ -237,10 +237,8 @@ export class WiFiStreamedVideoSource {
   toggle() {
     if (this.videoTag.paused) {
       this.videoTag.play()
-      this.connect()
     } else {
       this.videoTag.pause()
-      this.peerConnection?.close()
     }
   }
 

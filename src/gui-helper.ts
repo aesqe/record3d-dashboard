@@ -102,6 +102,15 @@ export const guiHelper = (scene: Record3DScene) => {
         ptCloud.setUseSingleColor(scene.options.useSingleColor)
       }
     })
+
+  gui
+    .add(scene.options, 'halfResolution')
+    .name('Half Resolution')
+    .onChange((value: boolean) => {
+      scene.halfResolution = value
+      scene.onWindowResize(true)
+    })
+
   gui
     .addColor(scene.options, 'backgroundColor')
     .name('Canvas color')
@@ -173,6 +182,7 @@ export const guiHelper = (scene: Record3DScene) => {
         ptCloud.useNoise(scene.options.useNoise)
       }
     })
+
   gui
     .add(scene.options, 'noiseStrength')
     .name('Noise strength')
@@ -185,9 +195,18 @@ export const guiHelper = (scene: Record3DScene) => {
       }
     })
 
+  gui
+    .add(scene.options, 'randomizeSeed')
+    .name('Random noise multiplier')
+    .onChange((value: boolean) => {
+      scene.randomizeSeed = value
+    })
+
   gui.add(scene.options, 'toggleSound').name('Mute/Unmute')
   gui.add(scene.options, 'savePreset').name('Save Preset')
   gui.add(scene.options, 'transparentBackground').name('Transparent background')
+  gui.add(scene.options, 'exportPresets').name('Export Presets')
+  gui.add(scene.options, 'importPresets').name('Import Presets')
 
   gui
     .add(scene.options, 'renderingMode', [

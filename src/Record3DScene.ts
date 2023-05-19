@@ -8,7 +8,8 @@ import {
   guiHelper,
   addGuiPreset,
   LilGuiPreset,
-  getGuiPresetsList
+  getGuiPresetsList,
+  getGuiPresets
 } from './gui-helper'
 import { Record3DVideo } from './Record3DVideo'
 import { getCameraPosition } from './utils'
@@ -24,6 +25,8 @@ export class Record3DScene {
   pointClouds: Record3DVideo[]
   options: any
   gui: GUI
+  halfResolution: boolean
+  randomizeSeed: boolean
 
   constructor(fov: number, near: number, far: number, id = 'canvas1') {
     this.onDocumentKeyDown = this.onDocumentKeyDown.bind(this)
@@ -31,6 +34,8 @@ export class Record3DScene {
     this.runLoop = this.runLoop.bind(this)
 
     let self = this
+    this.halfResolution = false
+    this.randomizeSeed = false
     this.mainScene = new THREE.Scene()
     this.mainScene.background = null
     this.renderer = new THREE.WebGLRenderer({ alpha: true })
@@ -100,6 +105,45 @@ export class Record3DScene {
       absoluteDepthRangeFilterX: 0.1,
       absoluteDepthRangeFilterY: 2.8,
       renderingMode: 'points',
+      halfResolution: false,
+      randomizeSeed: false,
+      exportPresets: () => {
+        const presets = getGuiPresets()
+        const dataStr =
+          'data:text/json;charset=utf-8,' +
+          encodeURIComponent(JSON.stringify(presets))
+        const downloadAnchorNode = document.createElement('a')
+        downloadAnchorNode.setAttribute('href', dataStr)
+        downloadAnchorNode.setAttribute('download', 'presets.json')
+        document.body.appendChild(downloadAnchorNode) // required for firefox
+        downloadAnchorNode.click()
+        downloadAnchorNode.remove()
+      },
+      importPresets: () => {
+        const input = document.createElement('input')
+        input.type = 'file'
+        input.accept = '.json'
+        input.onchange = e => {
+          const file = (e.target as HTMLInputElement).files?.[0]
+          if (file) {
+            const reader = new FileReader()
+            reader.readAsText(file, 'UTF-8')
+            reader.onload = readerEvent => {
+              const content = readerEvent.target?.result
+              if (typeof content === 'string') {
+                const presets = JSON.parse(content) as LilGuiPreset[]
+                for (let preset of presets) {
+                  addGuiPreset(preset)
+                }
+                self.gui.controllers
+                  .find(c => c.property === 'presetName')
+                  ?.setValue(getGuiPresetsList())
+              }
+            }
+          }
+        }
+        input.click()
+      },
       transparentBackground() {
         self.renderer.domElement.style.backgroundColor = 'transparent'
         self.renderer.setClearColor(0x000000, 0)
@@ -152,7 +196,7 @@ export class Record3DScene {
     const deltaTime = now - then
     then = now
 
-    if (Math.random() > 1.8) {
+    if (Math.random() > 0.85 && this.randomizeSeed) {
       for (let ptCloud of this.pointClouds) {
         ptCloud.setSeed()
       }
@@ -168,20 +212,18 @@ export class Record3DScene {
     }
   }
 
-  onWindowResize() {
+  onWindowResize(force?: any) {
     const canvas = this.renderer.domElement
     const width = canvas.clientWidth
     const height = canvas.clientHeight
     const needResize = canvas.width !== width || canvas.height !== height
+    const divider = this.halfResolution ? 2 : 1
 
-    if (needResize) {
+    if (needResize || force === true) {
       this.composer.setSize(width, height)
-      this.renderer.setSize(width, height, false)
+      this.renderer.setSize(width / divider, height / divider, false)
       this.camera.aspect = width / height
       this.camera.updateProjectionMatrix()
-      const ratio = Math.ceil(window.devicePixelRatio)
-      canvas.width = width * ratio
-      canvas.height = height * ratio
       this.controls.update()
     }
   }

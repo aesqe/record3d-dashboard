@@ -39,11 +39,10 @@ const App = () => {
     wifiVideo.videoTag.play()
   }, [])
 
-  const resizeScenes = useCallback(() => {
-    scene1.onWindowResize()
-    scene2.onWindowResize()
-    scene3.onWindowResize()
-    scene1.camera.lookAt(new THREE.Vector3(0, 0, 0))
+  const resizeScenes = useCallback((force = false) => {
+    scene1.onWindowResize(force)
+    scene2.onWindowResize(force)
+    scene3.onWindowResize(force)
   }, [])
 
   const handleOverlay = useCallback((show: boolean) => {
@@ -111,13 +110,24 @@ const App = () => {
     if (e.key === 'o') {
       toggleOverlay()
     }
+
+    if (e.key === 'h') {
+      scene1.halfResolution = !scene1.halfResolution
+      scene2.halfResolution = !scene2.halfResolution
+      scene3.halfResolution = !scene3.halfResolution
+
+      resizeScenes(true)
+    }
   }
 
   useEffect(() => {
     wifiVideo.connect()
 
     scene1.addVideo(new Record3DVideo(wifiVideo, 1))
+
     scene1.runLoop()
+    scene2.runLoop()
+    scene3.runLoop()
 
     document.addEventListener('keydown', keyListener)
 
@@ -134,14 +144,12 @@ const App = () => {
       scene3.removeVideos()
     }
 
-    if (sceneCount === 2 || previousCount.current === 1) {
+    if (sceneCount > 1 && previousCount.current !== 3) {
       scene2.addVideo(new Record3DVideo(wifiVideo, 2))
-      scene2.runLoop()
     }
 
     if (sceneCount === 3) {
       scene3.addVideo(new Record3DVideo(wifiVideo, 3))
-      scene3.runLoop()
     }
 
     hideElements('#r3d-video, #r3d-canvas')
