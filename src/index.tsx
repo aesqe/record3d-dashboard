@@ -17,6 +17,8 @@ const peerAddress = getPeerAddresses()[0]
 
 const wifiVideo = new WiFiStreamedVideoSource(peerAddress)
 
+wifiVideo.connect()
+
 const scene1 = new Record3DScene(40, 1e-4, 1e5, 'canvas-1')
 const scene2 = new Record3DScene(40, 1e-4, 1e5, 'canvas-2')
 const scene3 = new Record3DScene(40, 1e-4, 1e5, 'canvas-3')
@@ -24,10 +26,15 @@ const scene3 = new Record3DScene(40, 1e-4, 1e5, 'canvas-3')
 hideElements('.lil-gui, #r3d-video, #r3d-canvas')
 addClass('body', 'scenes-2')
 
+// @ts-ignore
+if (typeof window.InstallTrigger !== undefined) {
+  addClass('body', 'firefox')
+}
+
 const App = () => {
   const [playing, setPlaying] = useState(true)
   const [sceneCount, setSceneCount] = useState(2)
-  const previousCount = useRef(sceneCount)
+  const previousCount = useRef(1)
 
   const pauseVideos = useCallback(() => {
     setPlaying(false)
@@ -121,13 +128,12 @@ const App = () => {
   }
 
   useEffect(() => {
-    wifiVideo.connect()
-
     scene1.addVideo(new Record3DVideo(wifiVideo, 1))
+    scene2.addVideo(new Record3DVideo(wifiVideo, 2))
+    scene3.addVideo(new Record3DVideo(wifiVideo, 3))
 
     scene1.runLoop()
     scene2.runLoop()
-    scene3.runLoop()
 
     document.addEventListener('keydown', keyListener)
 
@@ -138,18 +144,18 @@ const App = () => {
 
   useEffect(() => {
     if (sceneCount === 1) {
-      scene2.removeVideos()
-      scene3.removeVideos()
+      scene2.stopLoop()
+      scene3.stopLoop()
     } else if (sceneCount === 2) {
-      scene3.removeVideos()
+      scene3.stopLoop()
     }
 
-    if (sceneCount > 1 && previousCount.current !== 3) {
-      scene2.addVideo(new Record3DVideo(wifiVideo, 2))
+    if (sceneCount > 1 && previousCount.current === 1) {
+      scene2.runLoop()
     }
 
     if (sceneCount === 3) {
-      scene3.addVideo(new Record3DVideo(wifiVideo, 3))
+      scene3.runLoop()
     }
 
     hideElements('#r3d-video, #r3d-canvas')

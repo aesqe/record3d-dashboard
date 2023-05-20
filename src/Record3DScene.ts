@@ -17,7 +17,7 @@ import { getCameraPosition } from './utils'
 let then = 0
 
 export class Record3DScene {
-  mainScene: THREE.Scene
+  scene: THREE.Scene
   renderer: THREE.WebGLRenderer
   camera: THREE.PerspectiveCamera
   controls: OrbitControls
@@ -27,6 +27,7 @@ export class Record3DScene {
   gui: GUI
   halfResolution: boolean
   randomizeSeed: boolean
+  animationFrameId: number
 
   constructor(fov: number, near: number, far: number, id = 'canvas1') {
     this.onDocumentKeyDown = this.onDocumentKeyDown.bind(this)
@@ -36,8 +37,10 @@ export class Record3DScene {
     let self = this
     this.halfResolution = false
     this.randomizeSeed = false
-    this.mainScene = new THREE.Scene()
-    this.mainScene.background = null
+    this.animationFrameId = 0
+
+    this.scene = new THREE.Scene()
+    this.scene.background = null
     this.renderer = new THREE.WebGLRenderer({ alpha: true })
     this.renderer.domElement.id = id
 
@@ -54,7 +57,7 @@ export class Record3DScene {
     this.camera.lookAt(new THREE.Vector3(0, 0, 0))
 
     this.composer = new EffectComposer(this.renderer)
-    this.composer.addPass(new RenderPass(this.mainScene, this.camera))
+    this.composer.addPass(new RenderPass(this.scene, this.camera))
 
     // Camera control settings
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
@@ -181,14 +184,18 @@ export class Record3DScene {
 
   addVideo(r3dVideo: Record3DVideo) {
     this.pointClouds.push(r3dVideo)
-    this.mainScene.add(r3dVideo.videoObject)
+    this.scene.add(r3dVideo.videoObject)
   }
 
   removeVideos() {
     for (let ptCloud of this.pointClouds) {
-      this.mainScene.remove(ptCloud.videoObject)
+      this.scene.remove(ptCloud.videoObject)
     }
     this.pointClouds = []
+  }
+
+  stopLoop() {
+    cancelAnimationFrame(this.animationFrameId)
   }
 
   runLoop(now = then) {
@@ -203,7 +210,7 @@ export class Record3DScene {
     }
 
     this.composer.render(deltaTime)
-    requestAnimationFrame(this.runLoop)
+    this.animationFrameId = requestAnimationFrame(this.runLoop)
   }
 
   toggleSound() {

@@ -70,7 +70,7 @@ export class WiFiStreamedVideoSource {
     document.body.appendChild(this.videoTag)
     document.body.appendChild(this.canvas)
 
-    this.videoTag.requestVideoFrameCallback(this.onVideoFrame)
+    // this.videoTag.requestVideoFrameCallback(this.onVideoFrame)
 
     const terminationEvent = 'onpagehide' in window ? 'pagehide' : 'unload'
 

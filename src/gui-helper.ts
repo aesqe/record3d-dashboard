@@ -116,7 +116,7 @@ export const guiHelper = (scene: Record3DScene) => {
     .name('Canvas color')
     .onChange(() => {
       console.log(scene.options.backgroundColor)
-      scene.mainScene.background = scene.options.backgroundColor
+      scene.scene.background = scene.options.backgroundColor
       scene.renderer.setClearColor(scene.options.backgroundColor)
       scene.renderer.domElement.style.backgroundColor =
         scene.options.backgroundColor
