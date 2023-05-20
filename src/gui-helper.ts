@@ -37,7 +37,9 @@ guiPresets = getGuiPresets()
 export const guiHelper = (scene: Record3DScene) => {
   const gui = new GUI()
 
-  gui
+  const rendering = gui.addFolder('Rendering')
+
+  rendering
     .add(scene.options, 'modelScale')
     .name('Scale')
     .min(0.1)
@@ -49,7 +51,7 @@ export const guiHelper = (scene: Record3DScene) => {
       }
     })
 
-  gui
+  rendering
     .add(scene.options, 'modelPointSize')
     .name('Point Size')
     .min(0.1)
@@ -61,68 +63,7 @@ export const guiHelper = (scene: Record3DScene) => {
       }
     })
 
-  gui
-    .add(scene.options, 'opacity')
-    .name('Opacity')
-    .min(0.1)
-    .max(1.0)
-    .step(0.1)
-    .onChange(() => {
-      for (let ptCloud of scene.pointClouds) {
-        ptCloud.setOpacity(scene.options.opacity)
-      }
-    })
-
-  gui
-    .add(scene.options, 'saturation')
-    .name('Saturation')
-    .min(0.0)
-    .max(1.0)
-    .step(0.01)
-    .onChange(() => {
-      for (let ptCloud of scene.pointClouds) {
-        ptCloud.setSaturation(scene.options.saturation * 3.0)
-      }
-    })
-
-  gui
-    .addColor(scene.options, 'singleColorVec')
-    .name('Color')
-    .onChange(() => {
-      for (let ptCloud of scene.pointClouds) {
-        ptCloud.setSingleColor(scene.options.singleColorVec)
-      }
-    })
-
-  gui
-    .add(scene.options, 'useSingleColor')
-    .name('Use single color')
-    .onChange(() => {
-      for (let ptCloud of scene.pointClouds) {
-        ptCloud.setUseSingleColor(scene.options.useSingleColor)
-      }
-    })
-
-  gui
-    .add(scene.options, 'halfResolution')
-    .name('Half Resolution')
-    .onChange((value: boolean) => {
-      scene.halfResolution = value
-      scene.onWindowResize(true)
-    })
-
-  gui
-    .addColor(scene.options, 'backgroundColor')
-    .name('Canvas color')
-    .onChange(() => {
-      console.log(scene.options.backgroundColor)
-      scene.scene.background = scene.options.backgroundColor
-      scene.renderer.setClearColor(scene.options.backgroundColor)
-      scene.renderer.domElement.style.backgroundColor =
-        scene.options.backgroundColor
-    })
-
-  gui
+  rendering
     .add(scene.options, 'renderNthPoint')
     .name('Render each nth point only')
     .min(1)
@@ -134,7 +75,90 @@ export const guiHelper = (scene: Record3DScene) => {
       }
     })
 
-  gui
+  rendering
+    .add(scene.options, 'halfResolution')
+    .name('Half Resolution')
+    .onChange((value: boolean) => {
+      scene.halfResolution = value
+      scene.onWindowResize(true)
+    })
+
+  rendering
+    .add(scene.options, 'renderingMode', [
+      'points',
+      'mesh',
+      'mesh-wireframe',
+      'spheres'
+    ])
+    .name('Rendering mode')
+    .onChange(() => {
+      for (let ptCloud of scene.pointClouds) {
+        ptCloud.renderingMode = scene.options.renderingMode
+        ptCloud.onVideoTagChanged()
+      }
+    })
+
+  const color = gui.addFolder('Colors')
+
+  color
+    .add(scene.options, 'opacity')
+    .name('Opacity')
+    .min(0.1)
+    .max(1.0)
+    .step(0.1)
+    .onChange(() => {
+      for (let ptCloud of scene.pointClouds) {
+        ptCloud.setOpacity(scene.options.opacity)
+      }
+    })
+
+  color
+    .add(scene.options, 'saturation')
+    .name('Saturation')
+    .min(0.0)
+    .max(1.0)
+    .step(0.01)
+    .onChange(() => {
+      for (let ptCloud of scene.pointClouds) {
+        ptCloud.setSaturation(scene.options.saturation * 3.0)
+      }
+    })
+
+  color
+    .addColor(scene.options, 'singleColorVec')
+    .name('Color')
+    .onChange(() => {
+      for (let ptCloud of scene.pointClouds) {
+        ptCloud.setSingleColor(scene.options.singleColorVec)
+      }
+    })
+
+  color
+    .add(scene.options, 'useSingleColor')
+    .name('Use single color')
+    .onChange(() => {
+      for (let ptCloud of scene.pointClouds) {
+        ptCloud.setUseSingleColor(scene.options.useSingleColor)
+      }
+    })
+
+  color
+    .addColor(scene.options, 'backgroundColor')
+    .name('Canvas color')
+    .onChange(() => {
+      scene.scene.background = scene.options.backgroundColor
+      scene.renderer.setClearColor(scene.options.backgroundColor)
+      scene.renderer.domElement.style.backgroundColor =
+        scene.options.backgroundColor
+    })
+
+  color
+    .add(scene.options, 'transparentBackground')
+    .name('Transparent background')
+
+  const depth = gui.addFolder('Depth')
+
+  depth
     .add(scene.options, 'depthThresholdFilter')
     .name('Depth threshold')
     .min(0.001)
@@ -146,7 +170,7 @@ export const guiHelper = (scene: Record3DScene) => {
       }
     })
 
-  gui
+  depth
     .add(scene.options, 'absoluteDepthRangeFilterX')
     .name('Depth range X')
     .min(0.005)
@@ -160,7 +184,7 @@ export const guiHelper = (scene: Record3DScene) => {
       }
     })
 
-  gui
+  depth
     .add(scene.options, 'absoluteDepthRangeFilterY')
     .name('Depth range Y')
     .min(0.005)
@@ -174,7 +198,8 @@ export const guiHelper = (scene: Record3DScene) => {
       }
     })
 
-  gui
+  const noise = gui.addFolder('Noise')
+  noise
     .add(scene.options, 'useNoise')
     .name('Use displacement noise')
     .onChange(() => {
@@ -183,7 +208,7 @@ export const guiHelper = (scene: Record3DScene) => {
       }
     })
 
-  gui
+  noise
     .add(scene.options, 'noiseStrength')
     .name('Noise strength')
     .min(0.0)
@@ -195,34 +220,16 @@ export const guiHelper = (scene: Record3DScene) => {
       }
     })
 
-  gui
+  noise
     .add(scene.options, 'randomizeSeed')
     .name('Random noise multiplier')
     .onChange((value: boolean) => {
       scene.randomizeSeed = value
     })
 
-  gui.add(scene.options, 'toggleSound').name('Mute/Unmute')
-  gui.add(scene.options, 'savePreset').name('Save Preset')
-  gui.add(scene.options, 'transparentBackground').name('Transparent background')
-  gui.add(scene.options, 'exportPresets').name('Export Presets')
-  gui.add(scene.options, 'importPresets').name('Import Presets')
+  const presets = gui.addFolder('Presets')
 
-  gui
-    .add(scene.options, 'renderingMode', [
-      'points',
-      'mesh',
-      'mesh-wireframe',
-      'spheres'
-    ])
-    .onChange(() => {
-      for (let ptCloud of scene.pointClouds) {
-        ptCloud.renderingMode = scene.options.renderingMode
-        ptCloud.onVideoTagChanged()
-      }
-    })
-
-  const presetNameController = gui.add(
+  const presetNameController = presets.add(
     scene.options,
     'presetName',
     getGuiPresetsList()
@@ -238,6 +245,15 @@ export const guiHelper = (scene: Record3DScene) => {
       loadCameraPosition(scene, preset.view)
     }
   })
+
+  presets.add(scene.options, 'savePreset').name('Save Preset')
+  presets.add(scene.options, 'exportPresets').name('Export Presets')
+  presets.add(scene.options, 'importPresets').name('Import Presets')
+
+  const misc = gui.addFolder('Misc.')
+
+  misc.add(scene.options, 'toggleSound').name('Mute/Unmute')
+  misc.add(scene.options, 'resetOptions').name('Reset Options')
 
   return gui
 }

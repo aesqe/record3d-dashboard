@@ -48,14 +48,12 @@ export class WiFiStreamedVideoSource {
 
     let self = this
 
-    this.videoTag.onloadeddata = async e => {
-      console.log('onloadeddata')
-      await self.updateVideoResolution()
+    this.videoTag.onloadeddata = e => {
+      self.updateVideoResolution()
     }
 
-    this.videoTag.onprogress = async e => {
-      console.log('onprogress')
-      await self.updateVideoResolution()
+    this.videoTag.onprogress = e => {
+      self.updateVideoResolution()
     }
 
     this.updateFrameImageData = this.updateFrameImageData.bind(this)

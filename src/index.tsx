@@ -1,50 +1,54 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import * as THREE from 'three'
+import { useHotkeys } from 'react-hotkeys-hook'
 
+import { WiFiStreamedVideoSource } from './video-sources/WiFiStreamedVideoSource'
 import { Record3DVideo } from './Record3DVideo'
 import { Record3DScene } from './Record3DScene'
-import {
-  addClass,
-  hideElements,
-  removeClass,
-  toggleElements,
-  getPeerAddresses
-} from './utils'
-import { WiFiStreamedVideoSource } from './video-sources/WiFiStreamedVideoSource'
-
-const peerAddress = getPeerAddresses()[0]
-
-const wifiVideo = new WiFiStreamedVideoSource(peerAddress)
-
-wifiVideo.connect()
-
-const scene1 = new Record3DScene(40, 1e-4, 1e5, 'canvas-1')
-const scene2 = new Record3DScene(40, 1e-4, 1e5, 'canvas-2')
-const scene3 = new Record3DScene(40, 1e-4, 1e5, 'canvas-3')
-
-hideElements('.lil-gui, #r3d-video, #r3d-canvas')
-addClass('body', 'scenes-2')
+import { addClass, hide, removeClass, toggle, getPeerAddresses } from './utils'
+import { HotkeysEvent } from 'react-hotkeys-hook/dist/types'
 
 // @ts-ignore
 if (typeof window.InstallTrigger !== undefined) {
   addClass('body', 'firefox')
 }
 
+const peerAddress = getPeerAddresses()[0]
+const wifiVideo = new WiFiStreamedVideoSource(peerAddress)
+const scene1 = new Record3DScene(40, 1e-4, 1e5, 'canvas-1')
+const scene2 = new Record3DScene(40, 1e-4, 1e5, 'canvas-2')
+const scene3 = new Record3DScene(40, 1e-4, 1e5, 'canvas-3')
+
+wifiVideo.connect()
+
+hide('.lil-gui, #r3d-video, #r3d-canvas')
+addClass('body', 'scenes-2')
+
 const App = () => {
   const [playing, setPlaying] = useState(true)
   const [sceneCount, setSceneCount] = useState(2)
   const previousCount = useRef(1)
 
-  const pauseVideos = useCallback(() => {
-    setPlaying(false)
-    wifiVideo.videoTag.pause()
+  const toolbarVisible = () =>
+    !document.querySelector('#toolbar')?.classList.contains('hidden')
+
+  const pauseVideos = useCallback(async () => {
+    await wifiVideo.videoTag.pause()
+    await setPlaying(false)
   }, [])
 
-  const playVideos = useCallback(() => {
-    setPlaying(true)
-    wifiVideo.videoTag.play()
+  const playVideos = useCallback(async () => {
+    await wifiVideo.videoTag.play()
+    await setPlaying(true)
   }, [])
+
+  const toggleVideoPlayback = useCallback(async () => {
+    if (playing) {
+      await pauseVideos()
+    } else {
+      await playVideos()
+    }
+  }, [playing])
 
   const resizeScenes = useCallback((force = false) => {
     scene1.onWindowResize(force)
@@ -80,53 +84,45 @@ const App = () => {
     handleOverlay(!document.body.classList.contains('overlay'))
   }, [])
 
-  const keyListener = (e: KeyboardEvent) => {
-    if (e.key === '0') {
-      toggleElements('#toolbar')
+  // keyboard shortcuts
+
+  useHotkeys('1,2,3', (_, h: HotkeysEvent) => {
+    const count = parseInt(h.keys?.[0] || '')
+
+    setSceneCount(count)
+    removeClass('body', 'scenes-1')
+    removeClass('body', 'scenes-2')
+    removeClass('body', 'scenes-3')
+    addClass('body', 'scenes-' + count)
+  })
+
+  useHotkeys('h', () => {
+    scene1.toggleHalfResolution()
+    scene2.toggleHalfResolution()
+    scene3.toggleHalfResolution()
+
+    resizeScenes(true)
+  })
+
+  useHotkeys('tab,0', e => {
+    e.preventDefault()
+    toggle('#toolbar')
+
+    if (!toolbarVisible()) {
+      hide('.lil-gui')
+      hide('#r3d-video, #r3d-canvas')
     }
+  })
 
-    const toolbarVisible = !document
-      .querySelector('#toolbar')
-      ?.classList.contains('hidden')
+  useHotkeys('x', () => toolbarVisible() && toggle('.lil-gui'))
+  useHotkeys('v', () => toolbarVisible() && toggle('#r3d-video, #r3d-canvas'))
+  useHotkeys('o', toggleOverlay)
+  useHotkeys('space', toggleVideoPlayback)
+  useHotkeys('shift+r+1', scene1.resetCameraPosition)
+  useHotkeys('shift+r+2', scene2.resetCameraPosition)
+  useHotkeys('shift+r+3', scene3.resetCameraPosition)
 
-    if (!toolbarVisible) {
-      hideElements('.lil-gui')
-      hideElements('#r3d-video, #r3d-canvas')
-    } else {
-      if (e.key === 'v') {
-        toggleElements('#r3d-video, #r3d-canvas')
-      }
-
-      if (e.key === 'x') {
-        toggleElements('.lil-gui')
-      }
-    }
-
-    if (e.key === '1' || e.key === '2' || e.key === '3') {
-      const count = parseInt(e.key)
-
-      setSceneCount(count)
-
-      removeClass('body', 'scenes-1')
-      removeClass('body', 'scenes-2')
-      removeClass('body', 'scenes-3')
-
-      addClass('body', 'scenes-' + count)
-    }
-
-    if (e.key === 'o') {
-      toggleOverlay()
-    }
-
-    if (e.key === 'h') {
-      scene1.halfResolution = !scene1.halfResolution
-      scene2.halfResolution = !scene2.halfResolution
-      scene3.halfResolution = !scene3.halfResolution
-
-      resizeScenes(true)
-    }
-  }
-
+  // init
   useEffect(() => {
     scene1.addVideo(new Record3DVideo(wifiVideo, 1))
     scene2.addVideo(new Record3DVideo(wifiVideo, 2))
@@ -134,14 +130,9 @@ const App = () => {
 
     scene1.runLoop()
     scene2.runLoop()
-
-    document.addEventListener('keydown', keyListener)
-
-    return () => {
-      window.removeEventListener('keydown', keyListener)
-    }
   }, [])
 
+  // scene count handler
   useEffect(() => {
     if (sceneCount === 1) {
       scene2.stopLoop()
@@ -158,14 +149,21 @@ const App = () => {
       scene3.runLoop()
     }
 
-    hideElements('#r3d-video, #r3d-canvas')
+    hide('#r3d-video, #r3d-canvas')
 
     resizeScenes()
 
     previousCount.current = sceneCount
   }, [sceneCount])
 
-  const resetAll = () => {}
+  const resetAll = () => {
+    scene1.resetCameraPosition()
+    scene1.resetOptions()
+    scene2.resetCameraPosition()
+    scene2.resetOptions()
+    scene3.resetCameraPosition()
+    scene3.resetOptions()
+  }
 
   return (
     <div id='toolbar' className='hidden'>
@@ -178,7 +176,7 @@ const App = () => {
       <a onClick={showOverlay} id='button-overlay'>
         Overlay
       </a>
-      <a onClick={() => toggleElements('.lil-gui')} id='button-fx'>
+      <a onClick={() => toggle('.lil-gui')} id='button-fx'>
         FX
       </a>
       <a onClick={playVideos} id='button-play'>

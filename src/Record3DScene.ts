@@ -33,6 +33,8 @@ export class Record3DScene {
     this.onDocumentKeyDown = this.onDocumentKeyDown.bind(this)
     this.onWindowResize = this.onWindowResize.bind(this)
     this.runLoop = this.runLoop.bind(this)
+    this.resetCameraPosition = this.resetCameraPosition.bind(this)
+    this.resetOptions = this.resetOptions.bind(this)
 
     let self = this
     this.halfResolution = false
@@ -110,6 +112,7 @@ export class Record3DScene {
       renderingMode: 'points',
       halfResolution: false,
       randomizeSeed: false,
+      resetOptions: self.resetOptions,
       exportPresets: () => {
         const presets = getGuiPresets()
         const dataStr =
@@ -165,21 +168,24 @@ export class Record3DScene {
 
           addGuiPreset(preset)
 
-          console.log(
-            self.gui.controllers.find(c => c.property === 'presetName')
-          )
           self.gui.controllers
             .find(c => c.property === 'presetName')
             ?.setValue(getGuiPresetsList())
         }
       },
       toggleSound: () => {
-        for (let video of self.pointClouds) video.toggleSound()
+        for (let video of self.pointClouds) {
+          video.toggleSound()
+        }
       }
     }
 
     this.gui = guiHelper(self)
     this.gui.domElement.id = `gui-${id}`
+  }
+
+  resetOptions() {
+    this.gui.reset()
   }
 
   addVideo(r3dVideo: Record3DVideo) {
@@ -219,6 +225,10 @@ export class Record3DScene {
     }
   }
 
+  toggleHalfResolution() {
+    this.halfResolution = !this.halfResolution
+  }
+
   onWindowResize(force?: any) {
     const canvas = this.renderer.domElement
     const width = canvas.clientWidth
@@ -233,6 +243,12 @@ export class Record3DScene {
       this.camera.updateProjectionMatrix()
       this.controls.update()
     }
+  }
+
+  resetCameraPosition() {
+    this.camera.position.set(0, 0, 1.0)
+    this.camera.lookAt(new THREE.Vector3(0, 0, 0))
+    this.controls.update()
   }
 
   onDocumentKeyDown(event: KeyboardEvent) {
@@ -255,12 +271,6 @@ export class Record3DScene {
       this.camera.position.setX(this.camera.position.x + 0.1)
     } else if (keyCode === 'ArrowLeft') {
       this.camera.position.setX(this.camera.position.x - 0.1)
-    } else if (keyCode === 'R' && shiftKey) {
-      this.camera.position.x = 0.0
-      this.camera.position.y = 0.0
-      this.camera.position.z = 1.0
-      this.camera.lookAt(new THREE.Vector3(0, 0, 0))
-      this.controls.update()
     } else if (keyCode === 'q') {
       this.camera.rotateX(0.1)
     } else if (keyCode === 'e') {

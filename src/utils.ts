@@ -112,17 +112,17 @@ export const toggleClass = (selector: string, className: string) =>
     element.classList.toggle(className)
   })
 
-export const showElements = (selector: string) =>
+export const show = (selector: string) =>
   document.querySelectorAll(selector).forEach(element => {
     element.classList.remove('hidden')
   })
 
-export const hideElements = (selector: string) =>
+export const hide = (selector: string) =>
   document.querySelectorAll(selector).forEach(element => {
     element.classList.add('hidden')
   })
 
-export const toggleElements = (selector: string) =>
+export const toggle = (selector: string) =>
   document.querySelectorAll(selector).forEach(element => {
     element.classList.toggle('hidden')
   })

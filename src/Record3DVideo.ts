@@ -178,8 +178,6 @@ export class Record3DVideo {
     mesh.frustumCulled = false
     this.material.wireframe = wireFrame
     this.videoObject.add(mesh)
-
-    console.log(this.material.uniforms.texSize.value)
   }
 
   /** MODIFIERS */
