@@ -1,4 +1,5 @@
 import { GUI } from 'lil-gui'
+
 import { Record3DScene } from './Record3DScene'
 import { loadCameraPosition } from './utils'
 

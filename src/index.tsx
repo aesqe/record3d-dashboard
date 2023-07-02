@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { useHotkeys } from 'react-hotkeys-hook'
+import { HotkeysEvent } from 'react-hotkeys-hook/dist/types'
 
 import { WiFiStreamedVideoSource } from './video-sources/WiFiStreamedVideoSource'
 import { Record3DVideo } from './Record3DVideo'
 import { Record3DScene } from './Record3DScene'
 import { addClass, hide, removeClass, toggle, getPeerAddresses } from './utils'
-import { HotkeysEvent } from 'react-hotkeys-hook/dist/types'
+// import { UrlVideoSource } from './video-sources/URLVideoSource'
 
 // @ts-ignore
 if (typeof window.InstallTrigger !== undefined) {
@@ -14,12 +15,16 @@ if (typeof window.InstallTrigger !== undefined) {
 }
 
 const peerAddress = getPeerAddresses()[0]
-const wifiVideo = new WiFiStreamedVideoSource(peerAddress)
+const videoSource = new WiFiStreamedVideoSource(peerAddress)
+// const videoSource = new UrlVideoSource()
+// videoSource.load('http://localhost:3000/test.mp4')
 const scene1 = new Record3DScene(40, 1e-4, 1e5, 'canvas-1')
 const scene2 = new Record3DScene(40, 1e-4, 1e5, 'canvas-2')
 const scene3 = new Record3DScene(40, 1e-4, 1e5, 'canvas-3')
 
-wifiVideo.connect()
+if (videoSource instanceof WiFiStreamedVideoSource) {
+  videoSource.connect()
+}
 
 hide('.lil-gui, #r3d-video, #r3d-canvas')
 addClass('body', 'scenes-2')
@@ -33,12 +38,12 @@ const App = () => {
     !document.querySelector('#toolbar')?.classList.contains('hidden')
 
   const pauseVideos = useCallback(async () => {
-    await wifiVideo.videoTag.pause()
+    await videoSource.videoTag.pause()
     await setPlaying(false)
   }, [])
 
   const playVideos = useCallback(async () => {
-    await wifiVideo.videoTag.play()
+    await videoSource.videoTag.play()
     await setPlaying(true)
   }, [])
 
@@ -124,9 +129,9 @@ const App = () => {
 
   // init
   useEffect(() => {
-    scene1.addVideo(new Record3DVideo(wifiVideo, 1))
-    scene2.addVideo(new Record3DVideo(wifiVideo, 2))
-    scene3.addVideo(new Record3DVideo(wifiVideo, 3))
+    scene1.addVideo(new Record3DVideo(videoSource, 1))
+    scene2.addVideo(new Record3DVideo(videoSource, 2))
+    scene3.addVideo(new Record3DVideo(videoSource, 3))
 
     scene1.runLoop()
     scene2.runLoop()

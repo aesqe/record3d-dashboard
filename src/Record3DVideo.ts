@@ -1,6 +1,8 @@
 import * as THREE from 'three'
+
 import { getPointCloudShaderMaterial } from './pointcloud-material'
 import { WiFiStreamedVideoSource } from './video-sources/WiFiStreamedVideoSource'
+import { UrlVideoSource } from './video-sources/URLVideoSource'
 import { hexToGL } from './utils'
 
 interface VideoObject extends THREE.Group {
@@ -12,7 +14,7 @@ interface Spheres extends THREE.Group {
 
 export class Record3DVideo {
   material: THREE.ShaderMaterial
-  videoSource: WiFiStreamedVideoSource
+  videoSource: WiFiStreamedVideoSource | UrlVideoSource
   videoObject: VideoObject
   spheres: Spheres
   sphereMesh: THREE.InstancedMesh
@@ -23,7 +25,10 @@ export class Record3DVideo {
   dummy: THREE.Object3D
   renderingMode: string
 
-  constructor(videoSource: WiFiStreamedVideoSource, id: number) {
+  constructor(
+    videoSource: WiFiStreamedVideoSource | UrlVideoSource,
+    id: number
+  ) {
     this.id = id
     this.videoSource = {} as WiFiStreamedVideoSource
     this.material = {} as THREE.ShaderMaterial
@@ -39,7 +44,7 @@ export class Record3DVideo {
     this.setVideoSource(videoSource)
   }
 
-  async setVideoSource(videoSource: WiFiStreamedVideoSource) {
+  async setVideoSource(videoSource: WiFiStreamedVideoSource | UrlVideoSource) {
     this.material = await getPointCloudShaderMaterial()
 
     this.videoSource = videoSource
@@ -61,7 +66,28 @@ export class Record3DVideo {
       this.videoObject.remove(this.videoObject.children[0])
     }
 
-    this.videoSource.onVideoFrameCallback = () => {}
+    const videoSource = this.videoSource
+    const videoSize = videoSource.getVideoSize()
+
+    if (videoSize.width === 0 || videoSize.height === 0) {
+      return
+    }
+
+    videoSource.onVideoFrameCallback = () => {}
+
+    videoSource.videoTag.play()
+
+    const videoTexture = new THREE.VideoTexture(videoSource.videoTag)
+    videoTexture.minFilter = THREE.LinearFilter
+    videoTexture.magFilter = THREE.LinearFilter
+    videoTexture.format = THREE.RGBAFormat
+
+    const textureWidth = videoSource.videoTag.videoWidth
+    const textureHeight = videoSource.videoTag.videoHeight
+
+    this.material.uniforms.texSize.value = [textureWidth, textureHeight]
+    this.material.uniforms.texImg.value = videoTexture
+    this.material.uniforms.iK.value = videoSource.getIKValue()
 
     switch (this.renderingMode) {
       case 'mesh':
@@ -82,22 +108,11 @@ export class Record3DVideo {
   renderPointCloud() {
     const geometry = new THREE.BufferGeometry()
     const videoSize = this.videoSource.getVideoSize()
+    const numPoints = videoSize.width * videoSize.height
+    const bufferIndices = new Array(numPoints).fill(0).map((_, i) => i)
 
-    const bufferIndices = new Array(videoSize.width * videoSize.height)
-      .fill(0)
-      .map((_, i) => i)
     this.vertexIdx = new THREE.Float32BufferAttribute(bufferIndices, 1)
     this.geometryIndex = new THREE.Uint32BufferAttribute(bufferIndices, 1)
-
-    const newVideoWidth = videoSize.width * 2
-    const newVideoHeight = videoSize.height
-    const videoTexture = new THREE.VideoTexture(this.videoSource.videoTag)
-
-    this.videoSource.videoTag.play()
-
-    this.material.uniforms.iK.value = this.videoSource.getIKValue()
-    this.material.uniforms.texImg.value = videoTexture
-    this.material.uniforms.texSize.value = [newVideoWidth, newVideoHeight]
 
     geometry.setAttribute('vertexIdx', this.vertexIdx)
     geometry.setIndex(this.geometryIndex)
@@ -105,36 +120,17 @@ export class Record3DVideo {
     geometry.computeVertexNormals()
 
     const points = new THREE.Points(geometry, this.material)
-
     points.frustumCulled = false
 
     this.videoObject.add(points)
   }
 
   renderMesh(wireFrame = false) {
-    let videoSource = this.videoSource
-
-    const videoTexture = new THREE.VideoTexture(videoSource.videoTag)
-    videoTexture.minFilter = THREE.LinearFilter
-    videoTexture.magFilter = THREE.LinearFilter
-    videoTexture.format = THREE.RGBAFormat
-
-    videoSource.videoTag.play()
-
-    let newVideoWidth = videoSource.videoTag.videoWidth
-    let newVideoHeight = videoSource.videoTag.videoHeight
-    this.material.uniforms.texSize.value = [newVideoWidth, newVideoHeight]
-    this.material.uniforms.texImg.value = videoTexture
-
-    this.material.uniforms.iK.value = this.videoSource.getIKValue()
-
+    const geometry = new THREE.BufferGeometry()
     const videoSize = this.videoSource.getVideoSize()
 
-    if (videoSize.width === 0 || videoSize.height === 0) {
-      return
-    }
+    const numPoints = videoSize.width * videoSize.height
 
-    let numPoints = videoSize.width * videoSize.height
     const buffIndices = new Uint32Array(
       (videoSize.width - 1) * (videoSize.height - 1) * 6
     )
@@ -165,18 +161,19 @@ export class Record3DVideo {
       }
     }
 
-    let geometry = new THREE.BufferGeometry()
-    geometry.setAttribute(
-      'vertexIdx',
-      new THREE.Float32BufferAttribute(buffPointIndicesAttr, 1)
-    )
-    geometry.setIndex(
-      new THREE.Uint32BufferAttribute(new Uint32Array(buffIndices), 1)
-    )
+    const vertexIdx = new THREE.Float32BufferAttribute(buffPointIndicesAttr, 1)
+    const geometryIndex = new THREE.Uint32BufferAttribute(buffIndices, 1)
 
-    let mesh = new THREE.Mesh(geometry, this.material)
+    geometry.setAttribute('vertexIdx', vertexIdx)
+    geometry.setIndex(geometryIndex)
+    geometry.computeBoundingSphere()
+    geometry.computeVertexNormals()
+
+    const mesh = new THREE.Mesh(geometry, this.material)
     mesh.frustumCulled = false
+
     this.material.wireframe = wireFrame
+
     this.videoObject.add(mesh)
   }
 

@@ -30,7 +30,6 @@ export class Record3DScene {
   animationFrameId: number
 
   constructor(fov: number, near: number, far: number, id = 'canvas1') {
-    this.onDocumentKeyDown = this.onDocumentKeyDown.bind(this)
     this.onWindowResize = this.onWindowResize.bind(this)
     this.runLoop = this.runLoop.bind(this)
     this.resetCameraPosition = this.resetCameraPosition.bind(this)
@@ -70,15 +69,16 @@ export class Record3DScene {
     var maxPan = new THREE.Vector3(2, 2, 2)
     var _v = new THREE.Vector3()
 
-    const controls = this.controls
-    const camera = this.camera
+    this.controls.keys = {
+      LEFT: 'ArrowLeft', //left arrow
+      UP: 'ArrowUp', // up arrow
+      RIGHT: 'ArrowRight', // right arrow
+      BOTTOM: 'ArrowDown' // down arrow
+    }
 
-    controls.addEventListener('change', function () {
-      _v.copy(controls.target)
-      controls.target.clamp(minPan, maxPan)
-      _v.sub(controls.target)
-      camera.position.sub(_v)
-    })
+    this.controls.screenSpacePanning = false
+
+    this.controls.listenToKeyEvents(window)
 
     this.pointClouds = []
 
@@ -90,8 +90,6 @@ export class Record3DScene {
     // Setup resizing
     window.addEventListener('resize', this.onWindowResize, false)
     this.onWindowResize()
-
-    document.addEventListener('keydown', this.onDocumentKeyDown)
 
     // Setup UI
     this.options = {
@@ -249,40 +247,5 @@ export class Record3DScene {
     this.camera.position.set(0, 0, 1.0)
     this.camera.lookAt(new THREE.Vector3(0, 0, 0))
     this.controls.update()
-  }
-
-  onDocumentKeyDown(event: KeyboardEvent) {
-    const keyCode = event.key
-    const shiftKey = event
-
-    if (keyCode === 'ArrowUp') {
-      if (shiftKey) {
-        this.camera.position.setY(this.camera.position.y + 0.1)
-      } else {
-        this.camera.position.setZ(this.camera.position.z + 0.1)
-      }
-    } else if (keyCode === 'ArrowDown') {
-      if (shiftKey) {
-        this.camera.position.setY(this.camera.position.y - 0.1)
-      } else {
-        this.camera.position.setZ(this.camera.position.z - 0.1)
-      }
-    } else if (keyCode === 'ArrowRight') {
-      this.camera.position.setX(this.camera.position.x + 0.1)
-    } else if (keyCode === 'ArrowLeft') {
-      this.camera.position.setX(this.camera.position.x - 0.1)
-    } else if (keyCode === 'q') {
-      this.camera.rotateX(0.1)
-    } else if (keyCode === 'e') {
-      this.camera.rotateZ(0.1)
-    } else if (keyCode === 'w') {
-      this.camera.rotateY(0.1)
-    } else if (keyCode === 'Q') {
-      this.camera.rotateX(-0.1)
-    } else if (keyCode === 'E') {
-      this.camera.rotateZ(-0.1)
-    } else if (keyCode === 'W') {
-      this.camera.rotateY(-0.1)
-    }
   }
 }

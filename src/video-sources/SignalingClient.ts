@@ -34,16 +34,3 @@ export class Record3DSignalingClient {
     })
   }
 }
-
-export const getMetadata = async (serverURL: string) => {
-  // Metadata contains the intrinsic matrix
-  const metadataEndpoint = serverURL + '/metadata'
-
-  try {
-    const response = await fetch(metadataEndpoint)
-    return response.json()
-  } catch (e: any) {
-    console.log('Could not retrieve the intrinsic matrix.')
-    console.warn('Error while fetching metadata: ' + e.message)
-  }
-}
