@@ -3,31 +3,38 @@ import { createRoot } from 'react-dom/client'
 import { useHotkeys } from 'react-hotkeys-hook'
 import { HotkeysEvent } from 'react-hotkeys-hook/dist/types'
 
-import { WiFiStreamedVideoSource } from './video-sources/WiFiStreamedVideoSource'
-import { Record3DVideo } from './Record3DVideo'
 import { Record3DScene } from './Record3DScene'
-import { addClass, hide, removeClass, toggle, getPeerAddresses } from './utils'
-// import { UrlVideoSource } from './video-sources/URLVideoSource'
+import { addClass, hide, removeClass, toggle } from './utils'
 
 // @ts-ignore
 if (typeof window.InstallTrigger !== undefined) {
   addClass('body', 'firefox')
 }
 
-const peerAddress = getPeerAddresses()[0]
-const videoSource = new WiFiStreamedVideoSource(peerAddress)
-// const videoSource = new UrlVideoSource()
-// videoSource.load('http://localhost:3000/test.mp4')
-const scene1 = new Record3DScene(40, 1e-4, 1e5, 'canvas-1')
-const scene2 = new Record3DScene(40, 1e-4, 1e5, 'canvas-2')
-const scene3 = new Record3DScene(40, 1e-4, 1e5, 'canvas-3')
-
-if (videoSource instanceof WiFiStreamedVideoSource) {
-  videoSource.connect()
+const scenes = {
+  scene1: new Record3DScene(40, 1e-4, 1e5, 1),
+  scene2: new Record3DScene(40, 1e-4, 1e5, 2),
+  scene3: new Record3DScene(40, 1e-4, 1e5, 3)
 }
 
-hide('.lil-gui, #r3d-video, #r3d-canvas')
+Object.values(scenes).forEach(scene => {
+  scene.onClick((id: number) => {
+    currentScene = getCurrentScene(id)
+  })
+})
+
+const __DEV__ = false
+
+let currentScene = scenes.scene1
+
+const getCurrentScene = (id: number) =>
+  Object.values(scenes).find(scene => scene.id === id) || currentScene
+
 addClass('body', 'scenes-2')
+
+if (!__DEV__) {
+  hide('.lil-gui, [id^=r3d-video], #r3d-canvas')
+}
 
 const App = () => {
   const [playing, setPlaying] = useState(true)
@@ -38,12 +45,16 @@ const App = () => {
     !document.querySelector('#toolbar')?.classList.contains('hidden')
 
   const pauseVideos = useCallback(async () => {
-    await videoSource.videoTag.pause()
+    Object.values(scenes).forEach(scene => {
+      scene.pauseVideo()
+    })
     await setPlaying(false)
   }, [])
 
   const playVideos = useCallback(async () => {
-    await videoSource.videoTag.play()
+    Object.values(scenes).forEach(scene => {
+      scene.playVideo()
+    })
     await setPlaying(true)
   }, [])
 
@@ -56,9 +67,9 @@ const App = () => {
   }, [playing])
 
   const resizeScenes = useCallback((force = false) => {
-    scene1.onWindowResize(force)
-    scene2.onWindowResize(force)
-    scene3.onWindowResize(force)
+    Object.values(scenes).forEach(scene => {
+      scene.onWindowResize(force)
+    })
   }, [])
 
   const handleOverlay = useCallback((show: boolean) => {
@@ -102,9 +113,9 @@ const App = () => {
   })
 
   useHotkeys('h', () => {
-    scene1.toggleHalfResolution()
-    scene2.toggleHalfResolution()
-    scene3.toggleHalfResolution()
+    Object.values(scenes).forEach(scene => {
+      scene.toggleHalfResolution()
+    })
 
     resizeScenes(true)
   })
@@ -115,46 +126,54 @@ const App = () => {
 
     if (!toolbarVisible()) {
       hide('.lil-gui')
-      hide('#r3d-video, #r3d-canvas')
+      hide('[id^=r3d-video], #r3d-canvas')
     }
   })
 
   useHotkeys('x', () => toolbarVisible() && toggle('.lil-gui'))
-  useHotkeys('v', () => toolbarVisible() && toggle('#r3d-video, #r3d-canvas'))
+  useHotkeys(
+    'v',
+    () => toolbarVisible() && toggle('[id^=r3d-video], #r3d-canvas')
+  )
   useHotkeys('o', toggleOverlay)
   useHotkeys('space', toggleVideoPlayback)
-  useHotkeys('shift+r+1', scene1.resetCameraPosition)
-  useHotkeys('shift+r+2', scene2.resetCameraPosition)
-  useHotkeys('shift+r+3', scene3.resetCameraPosition)
+  useHotkeys('shift+r+1', scenes.scene1.resetCameraPosition)
+  useHotkeys('shift+r+2', scenes.scene2.resetCameraPosition)
+  useHotkeys('shift+r+3', scenes.scene3.resetCameraPosition)
+  useHotkeys('a', () => currentScene.advanceHorizontalRotation())
 
   // init
   useEffect(() => {
-    scene1.addVideo(new Record3DVideo(videoSource, 1))
-    scene2.addVideo(new Record3DVideo(videoSource, 2))
-    scene3.addVideo(new Record3DVideo(videoSource, 3))
+    scenes.scene1.useStreamingVideo()
+    scenes.scene2.useStreamingVideo()
+    scenes.scene3.useStreamingVideo()
 
-    scene1.runLoop()
-    scene2.runLoop()
+    scenes.scene1.runLoop()
+    scenes.scene2.runLoop()
+
+    if (!__DEV__) {
+      hide('#toolbar')
+    }
   }, [])
 
   // scene count handler
   useEffect(() => {
     if (sceneCount === 1) {
-      scene2.stopLoop()
-      scene3.stopLoop()
+      scenes.scene2.stopLoop()
+      scenes.scene3.stopLoop()
     } else if (sceneCount === 2) {
-      scene3.stopLoop()
+      scenes.scene3.stopLoop()
     }
 
     if (sceneCount > 1 && previousCount.current === 1) {
-      scene2.runLoop()
+      scenes.scene2.runLoop()
     }
 
     if (sceneCount === 3) {
-      scene3.runLoop()
+      scenes.scene3.runLoop()
     }
 
-    hide('#r3d-video, #r3d-canvas')
+    hide('[id^=r3d-video], #r3d-canvas')
 
     resizeScenes()
 
@@ -162,16 +181,14 @@ const App = () => {
   }, [sceneCount])
 
   const resetAll = () => {
-    scene1.resetCameraPosition()
-    scene1.resetOptions()
-    scene2.resetCameraPosition()
-    scene2.resetOptions()
-    scene3.resetCameraPosition()
-    scene3.resetOptions()
+    Object.values(scenes).forEach(scene => {
+      scene.resetCameraPosition()
+      scene.resetOptions()
+    })
   }
 
   return (
-    <div id='toolbar' className='hidden'>
+    <div id='toolbar'>
       <a onClick={resetAll} id='button-reset'>
         Reset
       </a>
@@ -194,30 +211,6 @@ const App = () => {
       >
         Pause
       </a>
-      {/* <div id='slider-noise'>
-        <input
-          type='range'
-          min='0'
-          max='1'
-          step='0.05'
-          defaultValue='0'
-          onChange={e =>
-            console.log((e.nativeEvent?.target as HTMLInputElement)?.value)
-          }
-        />
-      </div>
-      <div id='slider-pointsize'>
-        <input
-          type='range'
-          min='0.1'
-          max='30'
-          step='0.05'
-          defaultValue='1'
-          onChange={e =>
-            console.log((e.nativeEvent?.target as HTMLInputElement)?.value)
-          }
-        />
-      </div> */}
       <div id='preset-list'></div>
     </div>
   )

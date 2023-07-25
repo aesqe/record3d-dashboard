@@ -1,7 +1,4 @@
-import * as THREE from 'three'
-
 import { Record3DSignalingClient } from './SignalingClient'
-import { getPixelDepth } from '../utils'
 import { BaseVideoSource } from './BaseVideo'
 
 export class WiFiStreamedVideoSource extends BaseVideoSource {
@@ -15,6 +12,7 @@ export class WiFiStreamedVideoSource extends BaseVideoSource {
     this.peerAddress = deviceAddress
     this.peerConnection = null
     this.signalingClient = null
+    this.videoTag.id = `r3d-video-streaming-${Math.random() * 1000}`
 
     let self = this
 
@@ -79,40 +77,5 @@ export class WiFiStreamedVideoSource extends BaseVideoSource {
         .then(() => self.peerConnection?.createAnswer())
         .then(sdp => self.peerConnection?.setLocalDescription(sdp))
     })
-  }
-
-  getPoint(idx: number) {
-    const { width, height } = this.getVideoSize()
-    const iK = this.getIKValue()
-    const x = idx % width
-    const y = Math.floor(idx / height)
-
-    const px = iK[0] * x + iK[2]
-    const py = iK[1] * y + iK[3]
-    const pz = getPixelDepth(
-      new THREE.Vector2(px, py),
-      this.imageData,
-      new THREE.Vector2(width, height)
-    )
-
-    return new THREE.Vector3(px, py, pz)
-  }
-
-  _getPoint(idx: number) {
-    const x = idx % this.lastVideoSize.width
-    const y = Math.floor(idx / this.lastVideoSize.width)
-
-    return new THREE.Vector2(x, y)
-  }
-
-  getIKValue() {
-    const matrix = this.intrMat!.elements
-
-    const ifx = 1.0 / matrix[0]
-    const ify = 1.0 / matrix[4]
-    const itx = -matrix[2] / matrix[0]
-    const ity = -matrix[5] / matrix[4]
-
-    return [ifx, ify, itx, ity]
   }
 }

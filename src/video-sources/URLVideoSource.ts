@@ -2,11 +2,14 @@ import * as THREE from 'three'
 
 import { BaseVideoSource } from './BaseVideo'
 
+// TODO: manage reusing the same video tag
+
 export class UrlVideoSource extends BaseVideoSource {
   constructor() {
     super()
 
     this.intrMat = new THREE.Matrix3()
+    this.videoTag.id = `r3d-video-local-${Math.random() * 1000}`
 
     let self = this
 

@@ -24,6 +24,7 @@ export class Record3DVideo {
   spheresCount: number
   dummy: THREE.Object3D
   renderingMode: string
+  videoTexture: THREE.VideoTexture
 
   constructor(
     videoSource: WiFiStreamedVideoSource | UrlVideoSource,
@@ -37,11 +38,15 @@ export class Record3DVideo {
     this.sphereMesh = {} as THREE.InstancedMesh
     this.vertexIdx = {} as THREE.Float32BufferAttribute
     this.geometryIndex = {} as THREE.Uint32BufferAttribute
-    this.spheresCount = 1000
+    this.spheresCount = 640 * 960
     this.renderingMode = 'points'
     this.dummy = {} as THREE.Object3D
+    this.videoTexture = {} as THREE.VideoTexture
 
     this.setVideoSource(videoSource)
+
+    this.updateInstancedSpherePositions =
+      this.updateInstancedSpherePositions.bind(this)
   }
 
   async setVideoSource(videoSource: WiFiStreamedVideoSource | UrlVideoSource) {
@@ -73,8 +78,6 @@ export class Record3DVideo {
       return
     }
 
-    videoSource.onVideoFrameCallback = () => {}
-
     videoSource.videoTag.play()
 
     const videoTexture = new THREE.VideoTexture(videoSource.videoTag)
@@ -88,6 +91,8 @@ export class Record3DVideo {
     this.material.uniforms.texSize.value = [textureWidth, textureHeight]
     this.material.uniforms.texImg.value = videoTexture
     this.material.uniforms.iK.value = videoSource.getIKValue()
+
+    this.videoTexture = videoTexture
 
     switch (this.renderingMode) {
       case 'mesh':
@@ -121,6 +126,7 @@ export class Record3DVideo {
 
     const points = new THREE.Points(geometry, this.material)
     points.frustumCulled = false
+    points.position.set(0, 0, 0.5)
 
     this.videoObject.add(points)
   }
@@ -171,6 +177,7 @@ export class Record3DVideo {
 
     const mesh = new THREE.Mesh(geometry, this.material)
     mesh.frustumCulled = false
+    mesh.position.set(0, 0, 0.5)
 
     this.material.wireframe = wireFrame
 
@@ -274,46 +281,37 @@ export class Record3DVideo {
   renderInstancedSpheres() {
     console.log('renderInstancedSpheres')
 
-    this.videoSource.onVideoFrameCallback =
-      this.updateInstancedSpherePositions.bind(this)
-
     this.dummy = new THREE.Object3D()
     const sphereGeometry = new THREE.SphereGeometry(0.01, 4, 4)
     const sphereMaterial = new THREE.MeshBasicMaterial({
       color: '#ff0000',
-      transparent: true,
-      opacity: 0.25
+      transparent: false,
+      opacity: 1
     })
 
     this.sphereMesh = new THREE.InstancedMesh(
       sphereGeometry,
       sphereMaterial,
-      this.spheresCount
+      this.videoSource.getNumPoints()
     )
+
+    this.sphereMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+    this.sphereMesh.position.set(0, 0, 0.5)
 
     this.videoObject.add(this.sphereMesh)
 
-    for (let ptIdx = 0; ptIdx < this.spheresCount; ptIdx++) {
-      this.dummy.position.set(Math.random(), Math.random(), Math.random())
-      this.dummy.updateMatrix()
-
-      this.sphereMesh.setMatrixAt(ptIdx, this.dummy.matrix)
-    }
+    this.videoSource.onVideoFrameCallback = this.updateInstancedSpherePositions
   }
 
   updateInstancedSpherePositions() {
     console.log('updateInstancedSpherePositions')
 
-    for (let ptIdx = 0; ptIdx < this.spheresCount; ptIdx++) {
-      const { x, y, z } = this.videoSource.getPoint(ptIdx)
-
-      console.log('in')
-      this.dummy.position.set(Math.random(), Math.random(), Math.random())
+    for (let ptIdx = 0; ptIdx < this.spheresCount; ptIdx = ptIdx + 1) {
+      const coords = this.videoSource.getPoint(ptIdx)
+      this.dummy.position.set(coords[0], coords[1], coords[2])
       this.dummy.updateMatrix()
-
       this.sphereMesh.setMatrixAt(ptIdx, this.dummy.matrix)
+      this.sphereMesh.instanceMatrix.needsUpdate = true
     }
   }
-
-  addSpheres() {}
 }

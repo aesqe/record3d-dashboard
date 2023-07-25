@@ -60,6 +60,8 @@ export class BaseVideoSource {
 
     document.body.appendChild(this.videoTag)
     document.body.appendChild(this.canvas)
+
+    this.videoTag.requestVideoFrameCallback(this.onVideoFrame)
   }
 
   async onVideoFrame(now = then, metadata?: VideoFrameCallbackMetadata) {
@@ -103,7 +105,7 @@ export class BaseVideoSource {
   }
 
   async getMetadata() {
-    return {}
+    return null
   }
 
   updateVideoResolution() {
@@ -111,7 +113,9 @@ export class BaseVideoSource {
       this.videoTag.videoWidth != this.lastVideoSize.width ||
       this.videoTag.videoHeight != this.lastVideoSize.height
     ) {
-      this.getMetadata().then(metadata => this.processMetadata(metadata))
+      this.getMetadata().then(
+        metadata => metadata && this.processMetadata(metadata)
+      )
     }
 
     this.lastVideoSize.width = this.videoTag.videoWidth
@@ -138,12 +142,12 @@ export class BaseVideoSource {
     const px = iK[0] * x + iK[2]
     const py = iK[1] * y + iK[3]
     const pz = getPixelDepth(
-      new THREE.Vector2(px, py),
+      new THREE.Vector2(x, y),
       this.imageData,
       new THREE.Vector2(width, height)
     )
 
-    return new THREE.Vector3(px, py, pz)
+    return [px, py, pz]
   }
 
   _getPoint(idx: number) {

@@ -68,7 +68,8 @@ export const getPixelDepth = (
     .addVectors(pixel, new THREE.Vector2(0.5))
     .divide(texSize)
 
-  const hue = rgb2hue(texture2D(imageData, lookupPt))
+  const color = texture2D(imageData, lookupPt)
+  const hue = rgb2hue(color)
   const pixelDepth = 3.0 * hue
 
   return pixelDepth

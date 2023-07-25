@@ -16,6 +16,7 @@
     "@rollup/plugin-commonjs": "^24.1.0",
     "@rollup/plugin-node-resolve": "^15.0.2",
     "@rollup/plugin-typescript": "^11.1.0",
+    "camera-controls": "^2.3.5",
     "chokidar": "^3.5.3",
     "http-server": "^14.1.1",
     "lil-gui": "^0.18.1",

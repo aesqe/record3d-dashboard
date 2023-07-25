@@ -91,10 +91,8 @@ video {
   display: block;
 }
 
-#r3d-video {
+[id^='r3d-video'] {
   position: absolute;
-  top: 0;
-  left: 0;
 }
 
 #r3d-canvas {
